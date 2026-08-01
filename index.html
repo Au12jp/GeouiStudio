@@ -662,6 +662,75 @@ textarea.tin{height:auto;min-height:72px;padding:9px 11px;resize:vertical}
   .stage{height:var(--stage-h,46dvh)}
 }
 
+/* --- 10d. 縦画面（ポートレート）の操作性 ---------------------------------
+   スマホをたてに持ったときは、指で押す所を大きくし、
+   横に長い並びは折り返さずスワイプで見せる。               */
+@media (max-width:1023px) and (orientation:portrait){
+  :root{--ctl-h:44px;--tap:48px}
+  body{overscroll-behavior:none}
+
+  /* 上のバー：名前とボタンが窮屈にならないように */
+  .appbar{gap:4px;padding:0 8px}
+  .brand{padding-right:0}
+  .brand b{display:none}
+  .proj{margin-left:2px;flex:1 1 auto;min-width:0}
+  .proj input{height:36px;width:100%;font-size:15px;background:var(--surface-3)}
+  #btnLang{width:44px;padding:0;justify-content:center;font-size:11px;font-weight:700}
+  .appbar .iconbtn{width:38px;height:38px}
+  #btnExport{height:38px;padding:0 12px}
+
+  /* プレビューと再生バー：はみ出す並びはスワイプで */
+  .stage{height:var(--stage-h,34dvh);min-height:168px}
+  .stagebar,.transport{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:6px 10px}
+  .stagebar::-webkit-scrollbar,.transport::-webkit-scrollbar{display:none}
+  .stagebar > *,.transport > *{flex:0 0 auto}
+  .stagegrip{height:26px}
+  .stagegrip i{width:56px;height:5px}
+
+  /* 設定パネル：1列にして、押す所を大きく */
+  .grid2,.g2,.num-wrap{grid-template-columns:1fr}
+  .num-wrap{gap:8px}
+  .sec > .sec-h{min-height:48px;padding:12px var(--sp-3)}
+  .sec > .sec-b{padding:0 var(--sp-3) var(--sp-5)}
+  .field{margin-top:14px}
+  .tin,.num,.num > .val,.num > .step{height:44px}
+  .num{grid-template-columns:52px minmax(0,1fr) 52px}
+  .k,.btn{min-height:42px}
+  .k.sm{height:36px;min-height:36px}
+  .rowg{gap:8px}
+  .rowg > .k{flex:1 1 46%}
+  .seg > button{min-height:40px}
+  .chip{height:40px}
+  .swatches .sw{width:32px;height:32px}
+  .pickitem{min-height:64px}
+  .panel-body{padding-bottom:calc(var(--sp-6) + var(--safe-b))}
+
+  /* レイヤー一覧：行を大きく、サムネも見やすく */
+  .layer{grid-template-columns:32px 52px minmax(0,1fr) auto;min-height:52px;padding:6px 8px}
+  .layer .vis{width:32px;height:32px}
+  .layer canvas{width:52px;height:30px}
+  .addgrid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .addgrid .btn{height:56px}
+
+  /* タイムライン：名前欄をせまく、キー（◆）を大きく */
+  .timeline{height:32dvh;min-height:168px;max-height:44dvh}
+  .tl-grid,.tl-ruler{grid-template-columns:92px minmax(0,1fr)}
+  .tl-head{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px}
+  .tl-head::-webkit-scrollbar{display:none}
+  .tl-head > *{flex:0 0 auto}
+  .tl-title{display:none}
+  .tl-name,.tl-lane{height:44px}
+  .tl-name{padding:0 6px 0 10px;font-size:12px}
+  .tl-name.sub{padding-left:22px}
+  .tl-clip{top:8px;height:28px}
+  .kf{width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:4px}
+  .tl-trk button{width:26px;height:26px;font-size:11px}
+
+  /* 下のタブ */
+  .mobilenav button{min-height:60px;font-size:11px;gap:3px}
+  .toasts{bottom:calc(78px + var(--safe-b))}
+}
+
 /* --- 11. Accessibility --------------------------------------------------- */
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:var(--r-xs)}
 .btn:focus-visible,.chip:focus-visible,.iconbtn:focus-visible{outline-offset:2px}
@@ -7868,6 +7937,7 @@ const Stage = (() => {
     bx.style.transformOrigin = "center center";
     const z = $("#zoomLabel"); if (z) z.textContent = Math.round(app.stageZoom * 100) + "%";
   }
+  const Multi = { on: false };   /* 指が 2 本以上のっているか */
   function zoom(f) {
     app.stageZoom = clamp(app.stageZoom * f, .2, 8);
     applyView();
@@ -7875,6 +7945,40 @@ const Stage = (() => {
   function zoomFit() { app.stageZoom = 1; app.panX = 0; app.panY = 0; applyView(); }
   function initZoom() {
     const stage = $("#stage");
+
+    /* 指 2 本で拡大・移動（縦画面でも見たい所を大きくできる） */
+    const pts = new Map();
+    let pz = null;
+    const two = () => [...pts.values()];
+    const dist = () => { const a = two(); return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+    const mid = () => { const a = two(); return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; };
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch") return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        Multi.on = true;
+        pz = { d: dist(), m: mid(), z: app.stageZoom, px: app.panX, py: app.panY };
+      }
+    }, true);
+    stage.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "touch" || !pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size !== 2 || !pz) return;
+      e.preventDefault();
+      const d = dist(), m = mid();
+      app.stageZoom = clamp(pz.z * (d / (pz.d || 1)), 0.2, 8);
+      app.panX = pz.px + (m.x - pz.m.x);
+      app.panY = pz.py + (m.y - pz.m.y);
+      applyView();
+    }, { passive: false });
+    const drop = (e) => {
+      if (e.pointerType !== "touch") return;
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pz = null;
+      if (pts.size === 0) setTimeout(() => { if (pts.size === 0) Multi.on = false; }, 60);
+    };
+    stage.addEventListener("pointerup", drop, true);
+    stage.addEventListener("pointercancel", drop, true);
     stage.addEventListener("wheel", (e) => {
       if (!e.ctrlKey && !e.metaKey && Math.abs(e.deltaY) < 2) return;
       e.preventDefault();
@@ -7920,6 +8024,7 @@ const Stage = (() => {
     const node = $("#canvasBox");
     let mode = null, L = null, st = null;
     node.addEventListener("pointerdown", (e) => {
+      if (Multi.on) return;                       /* 2 本指のときは拡大・移動を優先 */
       if (e.shiftKey || e.button === 1) return;   /* 画面の移動と取り合いにならないように */
       const p = pos(e), cur = selLayer();
       mode = null;
@@ -7949,6 +8054,7 @@ const Stage = (() => {
       document.body.style.cursor = mode === "move" ? "grabbing" : "crosshair";
     });
     node.addEventListener("pointermove", (e) => {
+      if (Multi.on) { mode = null; document.body.style.cursor = ""; return; }
       if (!mode || !L) return;
       const p = pos(e);
       Store.commit("stage:" + mode, () => {
@@ -8723,6 +8829,61 @@ const I18N = (() => {
     "を実行してください。": ".", "を開く": "Open ", "を有効化": "Enable it",
     "2. ワールド設定でリソースパック": "2. Enable the resource pack in the world settings",
     "モデル(.geo.json)": "Model (.geo.json)", 
+
+    /* ---- 組み立て文の断片 / fragments of generated sentences ---------------- */
+    "」に音声が入っていません": "\u201D has no audio", "」にモデルが入っていません": "\u201D has no model",
+    "」に素材が入っていません": "\u201D has no artwork", "」はすけぐあいが 0 なので見えません": "\u201D is invisible (opacity is 0)",
+    "」は非表示のままです": "\u201D is still hidden", "」にスコアボード名が入っていません": "\u201D has no scoreboard name",
+    "」のテクスチャが 2048px を超えています。古い端末で映らないことがあります": "\u201D has a texture larger than 2048px. Older devices may not show it.",
+    "」は無いシーン（": "\u201D belongs to a scene that no longer exists (", "）に入っています": ")",
+    "」は最初と最後の値が違います。ループすると一瞬とびます": "\u201D starts and ends on different values, so the loop will jump",
+    "秒周期。全体の長さが半端なので、つなぎ目でカクつきます": "s cycle. The total length doesn't divide evenly, so the seam will stutter",
+    "」のループの継ぎ目をそろえました": "\u201D now loops seamlessly", "」をまるごと消す": "\u201D: remove it completely",
+    "」に値を入れる（例）": "\u201D: set a value (example)",
+    "」で": "\u201D: ", "文字のレイヤーを作りました": " text layers created",
+    "スコアボード「": "Scoreboard \u201C", "シーン「": "Scene \u201C",
+    "全体の長さを": "Total length: ", "秒にしました": " s", "秒にしました（ループの継ぎ目がなめらかになります）": " s (the loop seam is smooth now)",
+    "キーの時間を": "Key times \u00d7", "倍にしました": " applied", "ゲーム内の表示を": "In-game display ", "しました": " applied",
+    "に合わせました（": " matched (", "% にしました": "%", "画面の基準を新しい実測値（": "Screen reference set to the new measurement (",
+    "）に合わせました": ")", "か所の色を変えました": " colors changed",
+    "色を持つレイヤーがありませんでした": "None of the selected layers have a color",
+    "まとめて変える（": "Change together (", "枚）": " layers)",
+    "選択中のキーを消す（": "Delete the selected keys (",
+    "いまの 1 コマを画像で保存しました": "Saved the current frame as an image",
+    "最初から最後まで（": "Records the whole thing (", "秒）を録画します。録画中は再生が始まります。": " s). Playback starts while recording.",
+    "動画で保存しました（": "Saved as video (", "書き出しました：": "Exported: ",
+    "ファイル /": "files /", "ファイル ·": "files \u00b7", "は扱えない形式です": " is a format that can't be used",
+    "に自動保存されたプロジェクトが見つかりました。": " — an autosaved project was found.",
+    "」 · レイヤー": "\u201D \u00b7 Layers", "コマ ·": "frames \u00b7", "px · 目安": "px \u00b7 approx.",
+    "パーツが": "It has ", "個と多すぎます。文字数や分割数を減らしてください": " parts, which is too many. Use fewer characters or segments.",
+    "モデルのパーツが": "The model has ", "個あります。分割数や文字数を減らすと軽くなります。": " parts. Fewer segments or characters will make it lighter.",
+    "個。動きが重くなる場合があります": " parts. This may slow the animation down",
+    "合計が": "That's ", "MB あります。取り込みに時間がかかります": " MB in total, so importing will take a while",
+    "画像・音声もすべて含みます。ファイルは大きくなります。": "Includes every image and sound. The file will be large.",
+    "軽いですが、読み込んだ動画や画像は復元できません（デザインやエフェクトは復元できます）。": "Light, but imported video and images can't be restored (designs and effects can).",
+    "いまのレイヤーはそのまま残ります。": "Your current layers stay exactly as they are.",
+    "いまのレイヤーとシーンを消して差し替えます（元に戻すで復帰できます）。": "Replaces your current layers and scenes (undo brings them back).",
+    "トラック ·": "tracks \u00b7", "fps · 現在": "fps \u00b7 now", "レイヤー ·": "Layers \u00b7", "コマ /": "frames /",
+    "項目": "channels", "個": "", "板": "panels", "枚の板": " panels", "は板": " uses ", "枚が": " of which ",
+    "を並べて動かしています。": " arranged and animated.", "モデルの中で": " move inside the model",
+    "動いています。": ".", "で組み立てたモデルです。画像は使っていません。": " built into a model. No images are used.",
+    "下の設定は": "The settings below belong to ", "のものです。": ".",
+    "中身のタイミングは「プロパティ」の": "The internal timing lives under ",
+    "から。ここで付けた動きは、素材ぜんたいに重ねてかかります。": " in Properties. Motion added here layers on top of the whole element.",
+    "全体の長さ（": "The whole length (", "秒）を1周としてくり返します。": " s) is treated as one cycle and repeats.",
+    "/ 大きさ": "/ size", "/ 画面比": "/ aspect", "/ 倍率": "/ scale", "% / シーン": "% / scene",
+    "— 遅延": "— delay", "s / 長さ": "s / length", "（画面比×1000 の整数）": " (aspect \u00d7 1000, as an integer)",
+    "- シーン未設定（すべてのレイヤーが常時表示）": "- No scenes set (every layer is always visible)",
+    "お使いの端末に近いものを選んでください。": "Pick whichever is closest to your device.",
+    "画面比と中央のずれを、まとめて合わせます。": "It sets the aspect ratio and center offset together.",
+    "押すとすぐ変わります。": "Tapping changes it right away.",
+    "いちばん右にある「切れずに見えているボタン」": "the rightmost button that is still fully visible",
+    "を押します。": ".", "① 書き出したパック（": "1. The pack you exported (", "か": " or ",
+    "。見た目だけの .mcpack では動きません）": ". A looks-only .mcpack won't work.)",
+    "の BP と RP。実験トグルはすべて OFF のままで動きます。": " BP and RP. Every experimental toggle can stay off.",
+    "→ 画面いっぱいに目盛りが出るので、": "\u2192 A full-screen ruler appears, so ",
+    "共有 → ダウンロード →": "Share \u2192 Download \u2192", "下の": "Use ", "動き：": "Motion: ",
+    "（0→2→1 を 1.5 秒あけて順番に）": " (0 \u2192 2 \u2192 1, 1.5 s apart)",
   };
 
   /* 日本語が入っているかの判定（英数字だけの文字列は触らない） */
@@ -8737,6 +8898,7 @@ const I18N = (() => {
     [/^(.+?)を選ぶ$/,        (m) => "Choose " + t(m[1])],
     [/^(.+?)を消します。$/,   (m) => t(m[1]) + " will be deleted."],
     [/^「(.+?)」を出す$/,     (m) => "Show \u201C" + m[1] + "\u201D"],
+    [/^(.*?)「(.+?)」を作る$/, (m) => ("Create " + (m[1] ? t(m[1]) + " " : "") + "\u201C" + m[2] + "\u201D")],
     [/^シーン\s*(\d+)$/,      (m) => "Scene " + m[1]],
     [/^(.+?)を取り込みました$/,  (m) => "Imported " + t(m[1])],
     [/^(.+?)を読み込みました$/,  (m) => "Loaded " + t(m[1])],
