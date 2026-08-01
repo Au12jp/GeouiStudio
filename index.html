@@ -695,6 +695,7 @@ textarea.tin{height:auto;min-height:72px;padding:9px 11px;resize:vertical}
     <button class="iconbtn" id="btnUndo" aria-label="元に戻す" title="元に戻す (Ctrl+Z)"></button>
     <button class="iconbtn" id="btnRedo" aria-label="やり直す" title="やり直す (Ctrl+Shift+Z)"></button>
     <button class="iconbtn desk" id="btnCmd" aria-label="コマンド" title="コマンド (Ctrl+K)"></button>
+    <button class="btn sm ghost" id="btnLang" aria-label="Language / 言語" title="Language / 言語">あ JA</button>
     <button class="iconbtn desk" id="btnTheme" aria-label="表示テーマ" title="表示テーマ"></button>
     <button class="iconbtn desk" id="btnHelp" aria-label="ヘルプ" title="ヘルプ (?)"></button>
     <button class="btn primary" id="btnExport">書き出す</button>
@@ -8138,84 +8139,787 @@ const Stage = (() => {
 const visibleNow = Stage.visible;
 
 /* ============================================================================
-   GeoUI Studio — 言語（日本語 / English の 2 つだけ）
+   GeoUI Studio — 言語 / Language （日本語 と English の 2 つだけ）
      ・辞書は「日本語 → 英語」。画面に出す直前に差し替える方式なので、
-       既存のコードを日本語のまま置いておける。
-     ・切り替えたら、その場で画面じゅうの文字を入れ替える。
-     ・書き出す add-on 側も ja_JP / en_US の 2 つだけを出す。
+       アプリ本体のコードは日本語のまま置いておける。
+     ・初回起動時は言語を聞く（はじめて来た人が迷わないように）。
+     ・ヘッダーの JA / EN ボタンでいつでも切り替えられる。
    ========================================================================== */
 const I18N = (() => {
-  const EN = {"タイムライン": "Timeline", "レイヤー": "Layers", "シーン": "Scenes", "設定": "Settings", "動き": "Motion", "書き出し": "Export", "書き出す": "Export", "ファイル": "File", "編集": "Edit", "追加": "Add", "表示": "View", "ヘルプ": "Help", "準備完了": "Ready", "項目を追加": "Add channel", "長さを合わせる": "Fit to content", "等倍に戻す": "Reset zoom", "横に縮める": "Zoom out", "横に広げる": "Zoom in", "吸着": "Snap", "連動": "Ripple", "グラフ": "Graph", "目印": "Marker", "範囲": "Work area", "コマにぴったり合わせる": "Snap to frames", "動かしたキーより後ろも一緒にずらす": "Ripple following keys", "値の変化をグラフで見る": "Show value graph", "いまの時間に目印を置く": "Add marker at playhead", "いまの表示範囲を作業範囲にする": "Set work area", "レイヤーなし": "No layers", "このレイヤーだけ見る": "Solo this layer", "表示・非表示": "Show / hide", "動かせないようにする": "Lock", "キーフレームを開く": "Expand keyframes", "この項目を消す": "Remove channel", "目印を置きました": "Marker added", "目印を消しました": "Marker removed", "作業範囲を作りました（もう一度押すと外れます）": "Work area set (press again to clear)", "作業範囲を外しました": "Work area cleared", "このレイヤーは鍵がかかっています": "This layer is locked", "デザイン": "Design", "置いて並べるだけ": "Just place and arrange", "やめる": "Cancel", "これを使う": "Use this", "文字": "Text", "四角": "Rect", "丸": "Ellipse", "線": "Line", "飾り": "Icon", "写真": "Image", "閉じる": "Close", "前へ": "Forward", "後ろへ": "Backward", "中央に": "Center", "キャンバス": "Canvas", "背景を透明にする": "Transparent background", "テンプレート": "Templates", "使いかた": "How to use", "写真を選び直す": "Replace image", "出したい文字": "Text to show", "色": "Color", "大きさ": "Size", "作る": "Create", "そのまま": "As is", "全体を入れる": "Contain", "枠を埋める": "Cover", "背景を黒に": "Black background", "取り込む": "Import", "モノラル": "Mono", "ステレオ": "Stereo", "画面切り替え": "Switch view", "プレビュー端末…": "Preview device…", "画面を測ります": "Measuring the screen", "PC 16:9": "PC 16:9", "PC 16:10": "PC 16:10", "ウルトラワイド 21:9": "Ultrawide 21:9", "iPhone 19.5:9": "iPhone 19.5:9", "Android 20:9": "Android 20:9", "Android 18:9": "Android 18:9", "iPad 4:3": "iPad 4:3", "Switch 16:9": "Switch 16:9", "画面の診断をひらく": "Open screen setup", "ゲーム内の大きさ・縦横比が合わないとき": "When in-game size or aspect is off", "ゲーム内の大きさをまとめて変える": "Change in-game size", "小さすぎる／大きすぎるとき": "When too small or too large", "大きさをまとめて変える": "Scale everything", "無題のプロジェクト": "Untitled project", "GeoUI Studio で作成": "Made with GeoUI Studio", "レイヤーを追加すると、ここに時間の帯が並びます。": "Add a layer and its time bar appears here.", "選択中のキーを消す": "Delete selected keys", "再生する": "Play", "止める": "Stop"};
-  const KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);   /* 長い語から当てる */
-  let lang = "ja";
-  try { const v = localStorage.getItem("geoui.lang"); if (v === "en" || v === "ja") lang = v; } catch (e) {}
-  if (!(() => { try { return localStorage.getItem("geoui.lang"); } catch (e) { return null; } })()) {
-    try { if (!/^ja/i.test(navigator.language || "")) lang = "en"; } catch (e) {}
-  }
+  const EN = {
+    /* ---- 画面の骨組み / app frame ---------------------------------------- */
+    "メニュー": "Menu", "ファイル": "File", "編集": "Edit", "追加": "Add", "表示": "View", "ヘルプ": "Help",
+    "プロジェクト名": "Project name", "無題のプロジェクト": "Untitled project", "無題": "Untitled",
+    "元に戻す": "Undo", "やり直す": "Redo", "コマンド": "Command", "表示テーマ": "Theme",
+    "元に戻す (Ctrl+Z)": "Undo (Ctrl+Z)", "やり直す (Ctrl+Shift+Z)": "Redo (Ctrl+Shift+Z)",
+    "コマンド (Ctrl+K)": "Command (Ctrl+K)", "ヘルプ (?)": "Help (?)",
+    "書き出す": "Export", "書き出し": "Export", "レイヤー": "Layers", "シーン": "Scenes",
+    "設定": "Settings", "動き": "Motion", "タイムライン": "Timeline", "準備完了": "Ready",
+    "画面切り替え": "Switch view", "プレビューの大きさを変える": "Resize the preview",
+    "デザイン": "Design", "デザインボード": "Design board", "置いて並べるだけ": "Just place and arrange",
+    "Canva から": "From Canva", "やめる": "Cancel", "これを使う": "Use this", "閉じる": "Close",
+    "あとで": "Later", "次回から表示しない": "Don't show this again", "決定": "OK", "決定して保存": "Apply and save",
+    "取り込む": "Import", "開く": "Open", "保存": "Save", "開く…": "Open…", "保存…": "Save…",
+    "作る": "Create", "消す": "Delete", "削除": "Delete", "複製": "Duplicate", "コピー": "Copy",
+    "貼り付け": "Paste", "選ぶ": "Choose", "実行する": "Run", "もどる": "Back", "前へ": "Forward", "後ろへ": "Backward",
+
+    /* ---- メニュー項目 / menus --------------------------------------------- */
+    "新規作成": "New", "新規プロジェクト": "New project", "プロジェクトを開く": "Open project",
+    "プロジェクトを保存": "Save project", "ファイルを開く": "Open file", "ファイルに保存": "Save to file",
+    "テンプレートから…": "From a template…", "テンプレート": "Templates", "テンプレートから始める": "Start from a template",
+    "アドオンを書き出す": "Export add-on", "書き出す（先にチェック）": "Export (check first)",
+    "書き出す（先にチェック）…": "Export (check first)…", "形式を選んで書き出す": "Choose a format and export",
+    "形式を選んで書き出す…": "Choose a format and export…", "チェックして書き出す": "Check, then export",
+    "書き出す前のチェック": "Pre-export check", "見つかった問題": "Issues found",
+    "少し前の状態に戻す": "Go back a step", "少し前の状態に戻す…": "Go back a step…",
+    "自動でとった控え": "Automatic backups", "使い方": "How to use", "使いかた": "How to use",
+    "ショートカット": "Shortcuts", "ショートカット一覧": "Shortcut list", "キーボードショートカット": "Keyboard shortcuts",
+    "くわしい設定": "Advanced settings", "くわしい設定も表示する": "Show advanced settings",
+    "くわしい設定の表示を切り替える": "Toggle advanced settings",
+    "くわしい設定：動作": "Advanced: behavior", "くわしい設定：連携": "Advanced: integration",
+    "くわしい設定：書き出し": "Advanced: export",
+    "テーマを切り替える": "Switch theme", "ライトテーマ": "Light theme", "ダークテーマ": "Dark theme",
+    "ライト / ダーク": "Light / Dark", "日本語 / English": "日本語 / English",
+    "コマンドを探す": "Find a command", "コマンドを探す…": "Find a command…",
+    "やりたいことを入力して Enter。矢印キーで選べます。": "Type what you want to do and press Enter. Use the arrow keys to pick.",
+    "例: そろえる / 書き出す / デザイン": "e.g. align / export / design",
+    "すべて選ぶ": "Select all", "すべてのレイヤーを選ぶ": "Select all layers", "選択解除": "Deselect",
+    "選択を解除": "Deselect", "範囲で選ぶ": "Select a range", "範囲でまとめて選ぶ": "Select several at once",
+    "レイヤーを追加で選ぶ": "Add to selection", "レイヤーを探す": "Find a layer",
+    "はじめの設定に戻す": "Reset to defaults", "はじめの設定に戻しました": "Reset to defaults",
+    "全部消す": "Clear all", "全部表示": "Show all", "まっさら": "Blank", "まっさらから始める": "Start from scratch",
+
+    /* ---- レイヤーパネル / layer panel ------------------------------------- */
+    "レイヤーなし": "No layers", "レイヤーがありません": "There are no layers",
+    "レイヤーを追加": "Add layer", "素材を追加": "Add element", "レイヤーを 1 枚足す": "Add one layer",
+    "レイヤーを複製": "Duplicate layer", "レイヤーを削除": "Delete layer", "削除する": "Delete",
+    "レイヤーをコピー / 貼り付け": "Copy / paste layer", "名前をつけ直す": "Rename",
+    "このレイヤーだけ見る": "Solo this layer", "これだけ表示（ソロ）": "Solo this layer",
+    "選んだものだけ表示（ソロ）": "Show only the selection (solo)", "ソロ表示をやめる": "Turn off solo",
+    "表示・非表示": "Show / hide", "表示する": "Show", "隠す": "Hide", "常に表示": "Always visible",
+    "動かせないようにする": "Lock", "位置を固定": "Lock position", "固定を解除": "Unlock", "固定": "Lock",
+    "キーフレームを開く": "Expand keyframes", "この項目を消す": "Remove this channel",
+    "ドラッグで並べ替え": "Drag to reorder", "並べ替えました": "Reordered",
+    "所属シーン": "Scene", "シーンを追加": "Add scene", "名前・色・表示・固定": "Name, color, visibility, lock",
+    "まとめて複製": "Duplicate all", "まとめて削除": "Delete all", "まとめて変える…": "Change together…",
+    "選んだものをまとめて変える": "Change the selected items together",
+    "選択したレイヤーをそろえる": "Align the selected layers",
+    "選択しているレイヤーに、同じ変更をいっぺんに加えます。": "Applies the same change to every selected layer at once.",
+    "選んでいるレイヤーに、同じ変更をいっぺんに加えます。": "Applies the same change to every selected layer at once.",
+
+    /* ---- 追加できる素材 / add grid ---------------------------------------- */
+    "文字": "Text", "テキスト": "Text", "四角": "Rectangle", "丸": "Ellipse", "線": "Line",
+    "飾り": "Decoration", "写真": "Image", "画像": "Image", "動画": "Video", "音声": "Audio",
+    "図形": "Shape", "アイコン": "Icon", "モデル": "Model", "素材": "Element", "動く素材": "Animated element",
+    "動く素材…": "Animated elements…", "動く素材をつくる": "Create an animated element",
+    "動く素材から選ぶ": "Pick an animated element", "エフェクトの設定": "Effect settings",
+    "エフェクトを作り直す": "Rebuild the effect", "アニメーション": "Animation", "アニメを選ぶ": "Choose an animation",
+    "アニメを追加": "Add animation", "どう追加しますか": "How would you like to add it?",
+    "画像を選ぶ": "Choose an image", "動画を選ぶ": "Choose a video", "音声を選ぶ": "Choose audio",
+    "テクスチャを選ぶ": "Choose a texture", "PNG を選ぶ": "Choose a PNG", "モデルを差し替える": "Replace the model",
+    "テクスチャを変える": "Change the texture", "動画を取り込む": "Import a video", "音声を取り込む": "Import audio",
+    "写真を選び直す": "Choose another image", "貼り付けた画像": "Pasted image",
+
+    /* ---- タイムライン / timeline ------------------------------------------ */
+    "項目を追加": "Add channel", "長さを合わせる": "Fit to content", "等倍に戻す": "Reset zoom",
+    "横に縮める": "Zoom out", "横に広げる": "Zoom in", "吸着": "Snap", "連動": "Ripple", "グラフ": "Graph",
+    "目印": "Marker", "範囲": "Work area", "コマにぴったり合わせる": "Snap to frames",
+    "動かしたキーより後ろも一緒にずらす": "Ripple the following keys", "値の変化をグラフで見る": "Show the value graph",
+    "いまの時間に目印を置く": "Add a marker at the playhead", "いまの表示範囲を作業範囲にする": "Set the visible range as the work area",
+    "目印を置きました": "Marker added", "目印を消しました": "Marker removed",
+    "作業範囲を作りました（もう一度押すと外れます）": "Work area set (press again to clear)",
+    "作業範囲を外しました": "Work area cleared", "このレイヤーは鍵がかかっています": "This layer is locked",
+    "レイヤーを追加すると、ここに時間の帯が並びます。": "Add a layer and its time bar will appear here.",
+    "しおりをはさむ": "Add a bookmark", "しおりをはさみました": "Bookmark added", "時間のしおり": "Time bookmarks",
+    "よく戻る場面に名前をつける": "Name the moments you keep coming back to",
+    "よく戻る場面に名前をつけておけます。": "You can name the moments you keep coming back to.",
+    "あとで一発で戻ってこられます。": "One tap brings you straight back later.",
+    "キーを打つ": "Add a key", "ここにキーを打つ": "Add a key here", "キーを複数選ぶ": "Select several keys",
+    "選択中のキーを消す": "Delete the selected keys", "選んでいる点（キー）": "Selected keys",
+    "点（キー）の細かい調整": "Fine-tune a key", "前のキーへ": "Previous key", "次のキーへ": "Next key",
+    "前のキー (,)": "Previous key (,)", "次のキー (.)": "Next key (.)", "前 / 次のキーへ": "Previous / next key",
+    "キー全体を伸縮": "Stretch all keys", "ずれ無しに戻す": "Remove the offset", "レーンをドラッグ": "Drag the lane",
+    "どれを動かすか": "What to animate", "どれを動かすかを追加": "Add something to animate",
+    "ここから次の点までの動き方": "How it moves from here to the next key",
+    "総コマ数": "Total frames", "コマ数": "Frames", "1コマの大きさ": "Frame size", "最大コマ数": "Max frames",
+    "きざみ": "Step", "分割数": "Segments", "コマの決め方": "How frames are chosen",
+    "再生する": "Play", "止める": "Stop", "一時停止": "Pause", "再生 / 一時停止": "Play / pause",
+    "再生位置": "Playhead", "再生位置へ動かす": "Move to the playhead", "今の位置へ": "To the current position",
+    "今の位置から": "From the current position", "最初から": "From the start", "先頭へ": "To the start",
+    "先頭へ (Home)": "To the start (Home)", "くり返す": "Loop", "くり返し再生する": "Loop playback",
+    "全体をくり返す": "Loop the whole thing", "自動ループ": "Auto loop", "ずっと": "Forever",
+    "録画する": "Record", "録画しています": "Recording", "再生速度": "Playback speed",
+    "記録モード（動かすと自動でキー）": "Record mode (moving adds keys automatically)",
+    "記録モード：動かすと自動でキーが入ります": "Record mode: moving something adds a key automatically",
+    "記録モードを解除しました": "Record mode turned off",
+    "動かすと自動でキーを打ちます": "Moving something adds a key automatically",
+
+    /* ---- 位置・大きさ / transform ----------------------------------------- */
+    "位置・大きさ・回転": "Position, size, rotation", "位置・回転・大きさをリセット": "Reset position, rotation and size",
+    "よこの位置": "X position", "たての位置": "Y position", "上下位置": "Vertical position",
+    "よこの大きさ（0 なら元の形のまま）": "Width (0 keeps the original shape)",
+    "たての大きさ（画面の何％）": "Height (% of the screen)", "大きさ": "Size", "大きさ（%）": "Size (%)",
+    "横幅": "Width", "高さ": "Height", "画像の幅": "Image width", "画像の高さ": "Image height",
+    "文字の高さ": "Text height", "文字の大きさ": "Text size", "数字の大きさ": "Number size",
+    "縦横比": "Aspect ratio", "画面比": "Aspect ratio", "画面比を": "Aspect ratio", "画面比を選ぶ": "Choose an aspect ratio",
+    "画面比を合わせ直す": "Re-match the aspect ratio", "画面にそろえました": "Matched to the screen",
+    "たて": "Vertical", "よこ": "Horizontal", "縦": "Vertical", "横": "Horizontal", "上": "Top", "下": "Bottom",
+    "左": "Left", "右": "Right", "中": "Middle", "中央": "Center", "全体": "All", "内容": "Content",
+    "まん中": "Center", "まん中に置く": "Put it in the center", "まん中に戻す": "Back to the center",
+    "まん中へ": "To the center", "中央に": "Center it", "中央を合わせる": "Center it",
+    "左上": "Top left", "右上": "Top right", "左下": "Bottom left", "右下": "Bottom right",
+    "左上に置く": "Place at top left", "右上に置く": "Place at top right",
+    "左下に置く": "Place at bottom left", "右下に置く": "Place at bottom right",
+    "左上へ": "To the top left", "右上へ": "To the top right", "左下へ": "To the bottom left", "右下へ": "To the bottom right",
+    "▲ うえへ": "▲ Up", "▼ したへ": "▼ Down", "◀ ひだりへ": "◀ Left", "▶ みぎへ": "▶ Right",
+    "左そろえ": "Align left", "右そろえ": "Align right", "上そろえ": "Align top", "下そろえ": "Align bottom",
+    "左右中央": "Center horizontally", "上下中央": "Center vertically", "そろえ": "Align",
+    "横に均等": "Distribute horizontally", "横に均等に並べる": "Distribute horizontally",
+    "縦に均等": "Distribute vertically", "縦に均等に並べる": "Distribute vertically",
+    "色をそろえる": "Match colors", "大きさを合わせる": "Match sizes", "全体を入れる": "Contain",
+    "枠を埋める": "Cover", "枠への収め方": "How it fits the frame", "そのまま": "As is",
+    "画面いっぱい": "Full screen", "画面いっぱいにする": "Fill the screen",
+    "端末に合わせて自動で全画面にする": "Fit the screen automatically on every device",
+    "画面の半分": "Half the screen", "画面の半分にする": "Make it half the screen", "半分": "Half",
+    "半分にする　÷2": "Halve it ÷2", "もっと大きく　×2": "Much bigger ×2",
+    "少し大きく　×1.25": "A bit bigger ×1.25", "少し小さく　×0.8": "A bit smaller ×0.8",
+    "拡大": "Zoom in", "縮小": "Zoom out", "ズームイン": "Zoom in", "ズームアウト": "Zoom out",
+    "拡大 / 縮小 / 等倍": "Zoom in / out / 1:1", "100% に戻す": "Back to 100%", "よく使う倍率": "Common zoom levels",
+    "好きな倍率で": "Any zoom level", "拡大のしかた": "How it scales", "何倍に伸ばしますか": "How much should it stretch?",
+    "横に引きのばす": "Stretch horizontally", "画面の高さ": "Screen height", "画面の高さ（今）": "Screen height (now)",
+    "画面の高さ（反映後）": "Screen height (after)", "画面の高さ（大きさの基準）": "Screen height (size reference)",
+    "回転・拡大の中心": "Rotation / scale pivot", "回転の速さ": "Rotation speed", "回って出る": "Spin in",
+    "回って消える": "Spin out", "1周の秒数": "Seconds per turn", "1周で回す角度": "Degrees per turn",
+    "回し続ける": "Keep spinning", "横に回り続ける": "Keep spinning sideways", "よこ回転": "Y rotation",
+    "よこ回転（奥行き）": "Y rotation (depth)", "遠近感": "Perspective", "プレビューの奥行きの強さ": "Preview depth strength",
+    "その端からの すきま（たて）": "Gap from that edge (vertical)", "その端からの すきま（よこ）": "Gap from that edge (horizontal)",
+    "画面のどこに出すか": "Where it appears on screen", "画面のどこに貼りつけるか": "Which edge it sticks to",
+    "端末が変わっても、その端に吸い付きます": "It stays glued to that edge on any device",
+    "クイック配置": "Quick placement", "よく使う置き方をワンタップで": "Common placements in one tap",
+    "配置しました": "Placed", "均等に並べました": "Distributed evenly",
+    "3 枚以上選ぶと均等に並べられます": "Select 3 or more layers to distribute them evenly",
+    "画面を動かす": "Pan the view", "選択中": "selected",
+
+    /* ---- 文字・色 / text and color ----------------------------------------- */
+    "出したい文字": "Text to show", "ここにセリフが入ります": "Your line of dialogue goes here",
+    "セリフ": "Dialogue", "書体": "Font", "ゴシック": "Sans serif", "明朝": "Serif", "等幅": "Monospace",
+    "游ゴシック": "Yu Gothic", "文言": "Wording", "名前": "Name", "メモ": "Note", "タイトル": "Title",
+    "サブタイトル": "Subtitle", "字幕バー": "Subtitle bar", "字幕テロップ": "Subtitle strip",
+    "タイトルロゴ": "Title logo", "そろえ方": "Alignment", "太さ": "Weight", "細": "Thin", "標準": "Regular",
+    "太": "Bold", "極太": "Extra bold", "最太": "Heaviest", "色": "Color", "色1": "Color 1", "色2": "Color 2",
+    "色3": "Color 3", "色 2": "Color 2", "左の色": "Left color", "右の色": "Right color", "下の色": "Bottom color",
+    "もう一つの色": "Second color", "文字の色": "Text color", "数字の色": "Number color", "縁の色": "Edge color",
+    "ふちの色": "Outline color", "ふちの太さ": "Outline width", "縁取り": "Outline", "赤ふち": "Red outline",
+    "下地の色": "Background color", "背景の色": "Background color", "消えている時の色": "Color when off",
+    "べた塗り": "Solid", "グラデ": "Gradient", "グラデーションにする": "Use a gradient", "白＋金": "White + gold",
+    "ネオン": "Neon", "グリーン": "Green", "アンバー": "Amber", "アイス": "Ice", "ハート": "Heart",
+    "発光": "Glow", "きらめき": "Sparkle", "影の強さ": "Shadow strength", "影をつける": "Add a shadow",
+    "透明": "Transparent", "半透明": "Semi-transparent", "すけ具合": "Opacity", "すけぐあい": "Opacity",
+    "すけぐあい（0 で透明）": "Opacity (0 is invisible)", "暗幕": "Dim layer", "ふち暗く": "Dark vignette",
+    "赤ビネット": "Red vignette", "角丸": "Corner radius", "半径": "Radius", "線の太さ": "Line width",
+    "線の長さ": "Line length", "本数": "Count", "桁数": "Digits", "先頭の 0 を隠す": "Hide leading zeros",
+    "3桁カンマ(1/0)": "Thousands separator (1/0)", "数値": "Value", "値": "Value", "数値を入力": "Enter a value",
+    "数字を直接入れる": "Type a number", "目標の数字": "Target number", "止まる数字": "Final number",
+    "満タンの値": "Full value", "満タンで待つ秒数": "Seconds to hold when full", "目盛りの数": "Number of ticks",
+    "文字・図形・数字・エフェクトの主な色": "Main color for text, shapes, numbers and effects",
+    "文字や図形を並べて 1 枚の絵に": "Arrange text and shapes into a single picture",
+    "文字や図形を並べて 1 枚の絵にします。Canva で作った画像も貼り付けで使えます。": "Arrange text and shapes into one picture. You can paste images made in Canva too.",
+
+    /* ---- 動き / motion ------------------------------------------------------ */
+    "動かし方": "Easing", "描き方": "Style", "向き": "Direction", "種類": "Type", "かたち": "Shape",
+    "登場": "In", "退場": "Out", "導入": "Intro", "締め": "Outro", "本編": "Main", "始まる秒": "Start (s)",
+    "開始 秒": "Start (s)", "終了 秒": "End (s)", "時間 秒": "Time (s)", "秒数": "Seconds",
+    "全体の秒数": "Total seconds", "全体の長さ 秒": "Total length (s)", "かける秒数": "Duration (s)",
+    "描く秒数": "Draw time (s)", "止める秒数": "Hold time (s)", "増える秒数": "Count-up time (s)",
+    "戻る秒数": "Return time (s)", "鳴らす秒": "Play at (s)", "見る時間": "View time", "いま": "Now",
+    "おすすめの長さ": "Suggested length", "今の全体の長さ": "Current total length",
+    "長さをループに合わせる": "Match the length to the loop", "最後に合わせる": "Match the end",
+    "つなぎ目のカクつきを直す": "Smooth out the loop seam", "ループを調べる": "Check the loop",
+    "ループのなめらかさを調べる": "Check how smoothly it loops", "最初と最後をそろえる": "Match the first and last key",
+    "等速": "Linear", "なめらか": "Smooth", "なめらかさ": "Smoothness", "両端なめらか": "Smooth at both ends",
+    "そっと出だし": "Ease in", "やさしく着地": "Gentle landing", "勢いよく着地": "Hard landing",
+    "回転して着地": "Spin and land", "行き過ぎ": "Overshoot", "はずむ": "Bounce", "ぷるん": "Jiggle",
+    "ためて加速": "Wind up, then go", "少し戻ってから動く": "Pull back, then move",
+    "引いてから": "Pull back first", "溜めてから一気に": "Charge up, then release",
+    "じわっと動き出す": "Ease in slowly", "速く出て強く止まる": "Fast out, hard stop",
+    "すっと入ってふわり止まる": "Glides in, settles softly", "ずっと同じ速さ": "Constant speed",
+    "いちばん自然": "Most natural", "補間なし・瞬間移動": "No interpolation (jump)", "パッと切替": "Hard cut",
+    "ゴムのように揺れて止まる": "Wobbles like rubber, then stops",
+    "通り過ぎて戻る／ポップ": "Overshoots and comes back / pop",
+    "少し動かす": "Move a little", "大きく動かす": "Move a lot", "飛ぶ距離": "Travel distance",
+    "ゆらぎ": "Wobble", "ゆれ幅": "Sway amount", "波紋": "Ripple", "軽い": "Light", "通常": "Normal",
+    "フェードイン": "Fade in", "フェードアウト": "Fade out", "ふわっと寄る": "Drift in softly",
+    "上から落ちる": "Fall from above", "下から出る": "Rise from below", "下からせり上がる": "Slide up from below",
+    "下へ落ちる": "Drop down", "左から入る": "Enter from the left", "右から入る": "Enter from the right",
+    "左へ抜ける": "Exit to the left", "右へ抜ける": "Exit to the right", "上へ抜ける": "Exit upward",
+    "左右にゆれる": "Sway left and right", "ふわふわ浮く": "Float gently", "ふわふわ揺らす": "Float gently",
+    "ゆらゆら（ずっと）": "Sway (looping)", "波打つ（ずっと）": "Wave (looping)", "ネオン点滅（ずっと）": "Neon flicker (looping)",
+    "点滅（パッパッ）": "Blink", "明滅する": "Pulse", "呼吸する": "Breathe", "鼓動する": "Beat",
+    "縮んで消える": "Shrink away", "ぷるんと出る": "Pop in with a jiggle", "地面で跳ねる": "Bounce on the ground",
+    "ガタガタ震わせる": "Shake", "1文字ずつ回転": "Rotate letter by letter", "1文字ずつポップ": "Pop letter by letter",
+    "タイプライター": "Typewriter", "ゆっくり回る": "Slow spin", "動きに合わせる": "Follow the motion",
+    "動きのテンプレート": "Motion presets", "モーションをコピー": "Copy motion", "モーションを貼り付け": "Paste motion",
+    "動きを全部消しますか": "Delete every motion?", "時間で進む": "Driven by time", "スクリプト制御": "Script-driven",
+    "ストリーミング再生": "Streaming playback", "パラパラ再生のしかた": "How the frames play back",
+    "自動で測る": "Measure automatically", "自分で決める": "Set it yourself", "きれい": "High quality",
+
+    /* ---- 端末・画面の診断 / devices and screen setup ------------------------ */
+    "端末": "Device", "端末を選ぶ": "Choose a device", "端末ちがいを見る": "Compare devices",
+    "端末ちがいをまとめて見る": "Compare devices side by side", "端末ちがいをまとめて見る…": "Compare devices side by side…",
+    "プレビュー端末…": "Preview device…", "プレビューする端末": "Device to preview on",
+    "プレビューで動かす": "Play in the preview", "プレビューの背景": "Preview background",
+    "プレビュー用の値": "Preview value", "機種から選ぶだけ": "Just pick your device",
+    "かわりに、お使いの端末を選んでください": "Pick the device you're using instead",
+    "PC・パソコン": "PC / desktop", "スマホ・タブレット（iOS / Android）": "Phone / tablet (iOS / Android)",
+    "ゲーム機（Switch / PS / Xbox）": "Console (Switch / PS / Xbox)",
+    "iPhone（ホームボタン）": "iPhone (home button)", "iPhone（ホームバーあり）": "iPhone (home bar)",
+    "横長 21:9": "Wide 21:9", "縦 9:16": "Portrait 9:16", "ウルトラワイド（21:9）": "Ultrawide (21:9)",
+    "画面の診断をひらく": "Open screen setup", "画面の診断（ゲーム内）": "Screen setup (in game)",
+    "画面の診断（ゲーム内で合わせる）": "Screen setup (match it inside the game)",
+    "診断の記録": "Setup log", "診断の換算係数": "Setup conversion factor", 
+    "画面を測ります": "Measuring the screen", "まだ測っていません": "Not measured yet",
+    "自動診断は使えませんでした": "Automatic setup wasn't available",
+    "縦横比を測る（ボタンを押すだけ）": "Measure the aspect ratio (just tap the buttons)",
+    "ゲーム内の大きさ・縦横比が合わないとき": "When the in-game size or aspect ratio looks wrong",
+    "ゲーム内の大きさをまとめて変える": "Change the in-game size all at once",
+    "ゲーム内の大きさ…": "In-game size…", "ゲーム内の表示の大きさ": "In-game display size",
+    "小さすぎる／大きすぎるとき": "When it's too small or too large",
+    "大きさをまとめて変える": "Scale everything", "大きさを見ながら調整する": "Adjust while watching the size",
+    "大きさを保存しました": "Size saved", "中央のずれを保存しました": "Center offset saved",
+    "絵が上下にずれているとき": "When the picture sits too high or low",
+    "絵が左右に切れるなら大きい方へ、余るなら小さい方へ。": "If the sides get cut off go bigger; if there's empty space go smaller.",
+    "絵の中心が画面のど真ん中に来るまで動かしてください。": "Move it until the center of the picture sits dead center on screen.",
+    "ずれているところを選んでください": "Pick what looks off",
+    "左右が切れる／余るとき": "When the sides are cut off or too roomy",
+    "切れて困る範囲": "The area you can't afford to lose",
+    "端末のふちで隠れない範囲": "The area that stays clear of the device's edges",
+    "端末のふちの目安を出す": "Show a guide for the device's edges",
+    "この内側なら、どの端末でも隠れません": "Anything inside this stays visible on every device",
+    "画面比のちがいで切れないか確認": "Check that nothing gets cut off at other aspect ratios",
+    "画面の高さ＝モデル何単位ぶんか": "Screen height, measured in model units",
+    "モデル単位": "model units", "1文字ずつ": "letter by letter", "画面の1/3": "1/3 of the screen",
+    "16:9 なら 1.778": "1.778 for 16:9", "既定 fps": "Default fps", "なめらかさ fps": "Smoothness (fps)",
+    "判定できない時の既定": "Fallback when it can't be detected",
+    "実際の見た目を見ながら押してください": "Watch the real screen while you tap",
+    "押すと画面がすぐ動きます。合ったら「決定」。": "Tapping changes the screen right away. Press OK when it looks right.",
+    "画面の診断をまだ使っていません。ゲーム内の大きさが合わないときは試してください": "You haven't run screen setup yet. Try it if the in-game size looks off.",
+    "縦横比と大きさは、ゲームの中で実際の画面を測って合わせます。このアプリに数字を打ち直す必要はありません。": "Aspect ratio and size are measured on the real screen inside the game. You never have to retype numbers here.",
+    "作ったものが Minecraft で「小さすぎる／大きすぎる」ときは、ここでまとめて変えられます。": "If what you built looks too small or too large in Minecraft, you can rescale everything here.",
+    "同じデータが端末ごとにどう見えるか確認できます。書き出しには影響しません。": "See how the same project looks on each device. This doesn't affect the export.",
+    "同じデータが、画面比のちがう端末でどう見えるかを並べて確認できます。切れて困る部分がないか探してください。": "Compare how the project looks at different aspect ratios, and check that nothing important gets cut off.",
+    "「画面の高さがモデル何単位ぶんか」です。この数字を大きくすると、ゲーム内の表示も大きくなります。診断を使えば自動で入ります。": "This is how many model units tall the screen is. A bigger number means a bigger in-game display. Screen setup fills it in for you.",
+
+    /* ---- 書き出し / export --------------------------------------------------- */
+    "パックの名前": "Pack name", "名前空間（半角英数）": "Namespace (letters and numbers)",
+    "作者": "Author", "説明書を一緒に入れる": "Include a readme", "アドオンだけ": "Add-on only",
+    "とビヘイビアーパック": "and behavior pack", "ゲーム内コマンド": "In-game commands",
+    "ゲーム内で使うコマンド": "Commands to use in game", "ゲーム内で使うコマンド…": "Commands to use in game…",
+    "ゲーム内で使うコマンドを出す": "Show the commands to use in game",
+    "いまは必要なコマンドがありません": "No commands are needed right now",
+    "終わったら実行するコマンド（1行に1つ）": "Commands to run when it finishes (one per line)",
+    "ワールドに入ったら再生": "Play when the world loads", "アイテム使用で再生/停止": "Play / stop when an item is used",
+    "アイテムID": "Item ID", "表示条件": "When to show it", "この時だけ出す": "Only show it then",
+    "スコア連動": "Score link", "スコアボード名": "Scoreboard name", "スコアの値で選ぶ": "Pick by score value",
+    "ゲーム内の数字と連動させる": "Link it to a number in the game",
+    "ゲーム内の設定フォームを使う": "Use the in-game settings form",
+    "外部パックから操作できるようにする（IPC）": "Let other packs control it (IPC)",
+    "ふだんは切ったままで大丈夫です。Molang や外部連携が必要なときだけ入れてください。": "Leave this off unless you need Molang or another pack to talk to it.",
+    "画像素材に焼く": "Bake into image frames", "画像素材に焼く（モデルなしで使える）": "Bake into image frames (works without a model)",
+    "焼き込みの細かさ": "Bake detail", "素材を焼いています": "Baking the artwork",
+    "モデルを焼いています": "Baking the model", "パックを組み立てています": "Building the pack",
+    "ZIP にまとめています": "Packing everything into a ZIP", "JSON を作成しています": "Writing the JSON",
+    "音声を変換しています": "Converting the audio", "動画を取り込んでいます": "Importing the video",
+    "プロジェクトを保存しています": "Saving the project", "プロジェクトを読み込んでいます": "Loading the project",
+    "復元しています": "Restoring", "戻しています": "Going back", "保存中…": "Saving…", "保存済み": "Saved",
+    "未保存の変更": "Unsaved changes", "未読込": "Not loaded", "ファイルの重さ": "File size", "合計の目安": "Estimated total",
+    "テクスチャ最大辺": "Max texture size", "テクスチャ": "Texture", "モデルのパーツ": "Model parts",
+    "PNG の色": "PNG colors", "256色に減色": "Reduce to 256 colors", "フルカラー": "Full color",
+    "透明チェック": "Transparency check", "ドット等倍": "Pixel perfect", "ドットの大きさ": "Pixel size",
+    "小さいほど軽くなります": "Smaller is lighter", "画質": "Quality", "高音質": "High quality audio",
+    "音質": "Audio quality", "音量": "Volume", "モノラル": "Mono", "ステレオ": "Stereo", "ピッチ": "Pitch",
+    "鳴らし方": "How it plays", "チャンネル": "Channels", "一人称": "First person",
+    "静止画": "Still image", "動画で保存": "Save as video", "画像で保存": "Save as image",
+    "いまの1コマを画像で保存": "Save the current frame as an image",
+    "プレビューを動画で保存": "Save the preview as a video", "動画 / GIF": "Video / GIF",
+    "そのまま遊べるワールド": "A world you can play right away",
+    "そのまま遊べるワールドを書き出す": "Export a ready-to-play world",
+    "そのまま遊べるワールド（.mcworld）": "Ready-to-play world (.mcworld)",
+    "アドオン（.mcaddon）": "Add-on (.mcaddon)", "見た目だけ（.mcpack）": "Looks only (.mcpack)",
+    ".mcworld（そのまま遊べるワールド）": ".mcworld (ready-to-play world)",
+    ".mcaddon（パックだけ）": ".mcaddon (packs only)", ".mcpack（見た目だけ）": ".mcpack (looks only)",
+    "使い方に合わせて選んでください。迷ったら いちばん上 で大丈夫です。": "Pick whichever suits you. If you're not sure, the first one is a safe choice.",
+    "パックを入れたフラットのワールドを作ります。開くだけで確認できるので、": "Creates a flat world with the packs already in it. You just open it to check your work, so ",
+    "動作チェックがいちばん速い": "it's the fastest way to test",
+    "今あるワールドに入れて使います。ワールド設定でパックを有効にしてください。": "Add it to a world you already have, then enable the packs in the world settings.",
+    "リソースパックだけ。スコア連動やコマンドは動きません。": "Resource pack only. Score links and commands won't work.",
+    "この書き出しでは IPC は無効です。": "IPC is turned off in this export.",
+
+    /* ---- チェック / checks ---------------------------------------------------- */
+    "注意": "Warning", "問題は見つかりませんでした。": "No problems found.",
+    "すべて問題ありません。": "Everything looks fine.",
+    "つなぎ目に問題は見つかりませんでした。": "No problems found at the loop seam.",
+    "直してください": "Please fix these", "先にコピーしてください": "Copy it first",
+    "先にレイヤーを選んでください": "Select a layer first", "レイヤーを選んでください": "Select a layer",
+    "素材を選んでください": "Select an element", "名前を入れてください": "Enter a name",
+    "編集したいものを選んでください": "Select what you want to edit",
+    "先に編集したいものを選んでください": "Select what you want to edit first",
+    "先にモデルを読み込んでください": "Load a model first",
+    "モデルが読み込まれていません": "No model is loaded", "レイヤーを削除しました": "Layer deleted",
+    "やり直せる操作はありません": "There's nothing to redo", "これ以上戻せません": "There's nothing more to undo",
+    "元に戻すで復活できます。": "Undo brings it back.", "元に戻しました": "Undone", "やり直しました": "Redone",
+    "すでにぴったりです": "It already lines up", "うまくいきませんでした：": "That didn't work: ",
+    "不明なエラー": "Unknown error", "読み込めません": "Can't be loaded",
+    "画像にできませんでした": "Couldn't turn it into an image",
+    "録画を始められませんでした": "Couldn't start recording",
+    "フォームを登録できませんでした": "Couldn't register the form",
+    "フォームが大きすぎました": "The form was too large",
+    "プレイヤーから実行してください": "Run this as a player",
+    "コマンドを実行できませんでした（チート／権限）": "The command couldn't run (cheats or permissions)",
+    "テクスチャが大きすぎます": "The texture is too large",
+    "JSON を読めませんでした": "Couldn't read the JSON",
+    "JUCF が見つかりません": "JUCF wasn't found", "JUCF が入っているとき": "When JUCF is installed",
+    "geometry が見つかりません": "No geometry was found", "indexedDB なし": "no indexedDB",
+    "GIF ではありません": "That isn't a GIF", "と推定": " (estimated)", "と推定（": " (estimated, ",
+    "この動画は読み込めません（コーデック非対応の可能性）": "This video can't be loaded (the codec may not be supported)",
+    "この動画は読み込めませんでした（対応していない形式の可能性）": "This video couldn't be loaded (the format may not be supported)",
+    "このブラウザでは動画の保存に対応していません。画像での保存をお使いください": "This browser can't save video. Please save an image instead.",
+    "このファイルは GeoUI のプロジェクトではないようです": "This file doesn't look like a GeoUI project",
+    "モデル（.geo.json）ではないようです": "This doesn't look like a model (.geo.json)",
+    "アニメーション（.animation.json）ではないようです": "This doesn't look like an animation (.animation.json)",
+    "Blockbench の .geo.json を選んでください": "Choose a Blockbench .geo.json file",
+    "モデルの .png があれば選んでください。なくても白い状態で確認できます。": "Choose the model's .png if you have one. Without it the model shows in plain white.",
+    ".geo.json → テクスチャ →（任意）.animation.json の順に選びます。": "Pick them in order: .geo.json, then the texture, then optionally the .animation.json.",
+    ".animation.json があると、モデル自体の動きも再生できます。": "With an .animation.json the model's own animation can play too.",
+    "2048px を超えるテクスチャがあります。古い端末では表示されないことがあります。": "Some textures are larger than 2048px. Older devices may not show them.",
+    "レイヤーが 1 枚もありません。何も表示されません。": "There are no layers, so nothing will show up.",
+    "シーンがあるのに、最初に始めるシーンが決まっていません": "You have scenes, but no starting scene is set",
+    "長さを決められる要素がありません": "There's nothing here that sets the length",
+    "くり返し再生したときに、つなぎ目でカクつかないか確認します。": "Checks whether the loop stutters where it joins back up.",
+    "くり返し再生でつなぎ目がカクつくときは、ここで長さをそろえられます。": "If the loop stutters at the seam, you can line the length up here.",
+
+    /* ---- 動く素材・テンプレート / effects and templates ---------------------- */
+    "ゲージ": "Gauge", "スコア": "Score", "スコアボード": "Scoreboard", "ランキング": "Ranking",
+    "実績カード": "Achievement card", "実績ポップアップ": "Achievement popup", "実績を解除": "Unlock an achievement",
+    "実績を解除しました": "Achievement unlocked", "カード": "Card", "リング": "Ring", "輪": "Ring",
+    "帯": "Bar", "星": "Star", "三角": "Triangle", "矢印": "Arrow", "レーダー": "Radar", "ゲージ・カウンター・ローディング": "Gauges, counters, loaders",
+    "スコア＆ゲージ": "Score & gauge", "チャージゲージ": "Charge gauge", "HPバー（減って回復）": "Health bar (drops, then heals)",
+    "カウントダウン": "Countdown", "カウントアップ": "Count up", "スロットカウンター": "Slot counter",
+    "ローディング": "Loading", "ローディング（モデル）": "Loading (model)", "イコライザー（モデル）": "Equalizer (model)",
+    "セグメントゲージ（モデル）": "Segment gauge (model)", "ヒットバースト（モデル）": "Hit burst (model)",
+    "弧が円になる（モデル）": "Arc into a circle (model)", "弧が円になる": "Arc into a circle",
+    "7セグ・スロット（モデル）": "7-segment slots (model)", "7セグ・カウントアップ（モデル）": "7-segment count up (model)",
+    "ドット文字・波打つ（モデル）": "Dot text, waving (model)", "ドット文字・順次点灯（モデル）": "Dot text, lighting up (model)",
+    "ジャンプスケア": "Jump scare", "ダメージ演出": "Damage effect", "危険エリア": "Danger zone",
+    "カットシーン（3連鎖）": "Cutscene (3 chained scenes)", "乗り物": "Vehicle", "水の中": "Underwater",
+    "洞窟": "Cave", "洞窟（暗い）": "Cave (dark)", "雪原": "Snowfield", "雪原（真っ白）": "Snowfield (all white)",
+    "昼": "Day", "夜": "Night", "昼（明るい）": "Day (bright)", "夜（暗い）": "Night (dark)", "顔": "Face",
+    "モデルを取り込みました": "Model imported",
+    "選ぶだけで、動きの付いた素材ができます。あとから色も数字も自由に変えられます。": "Pick one and you get a ready-made animated element. Colors and numbers stay editable afterwards.",
+    "ぜんぶ後から自由に編集できます。文字も色も動きも、出発点として使ってください。": "Everything stays editable. Treat the text, colors and motion as a starting point.",
+    "完成形から中身を差し替える": "Start from a finished piece and swap the contents",
+    "タイトル・字幕・スコア表示など、完成形から中身を差し替えていきます。いちばん早いです。": "Titles, subtitles, score displays and more: start from a finished piece and swap in your own content. This is the quickest route.",
+    "自分で素材を読み込んで組み立てます。": "Load your own artwork and build it up yourself.",
+    "画像を使わず、": "No images at all: ", "画像を1枚も使いません。": "It doesn't use a single image.",
+    "打ち込むように1文字ずつパッと出ます。": "Letters appear one at a time, like typing.",
+    "1文字ずつ下から浮かび上がります。落ち着いた入り。": "Letters float up one by one. A calm entrance.",
+    "文字が順番に弾みながら現れます。歌詞やタイトルに。": "Letters bounce in one after another. Good for lyrics or titles.",
+    "1文字ずつ位相をずらして左右に傾きます。": "Each letter tilts left and right, slightly out of phase.",
+    "文字がサインカーブで上下し続けます。ループ演出に。": "The text rides a sine wave up and down. Made for loops.",
+    "ネオン管のように不規則に明滅します。1枚の文字レイヤーになります。": "Flickers irregularly like a neon tube. It becomes a single text layer.",
+    "中心から輪が広がり続けます。マーカーや衝撃の演出に。": "Rings keep spreading from the center. Good for markers and impacts.",
+    "円を一周する走査線。索敵やスキャン表現に。": "A sweep line circling round. Good for scanning or radar looks.",
+    "尾を引く光の輪。レイヤーの回転キーでぐるぐる回り続けます。": "A glowing ring with a tail. Rotation keys keep it spinning.",
+    "光の線が中心から放射状に飛び散り、輪が広がって消えます。攻撃や獲得の演出に。": "Light streaks burst outward while a ring expands and fades. Good for hits and pickups.",
+    "ゼロから弧が伸びて円周が完成し、最後に光って消えます。": "An arc grows from nothing into a full circle, then flashes and fades.",
+    "細い板が順に立ち上がって円周を描き、完成すると光が一周します。画像を1枚も使いません。": "Thin panels stand up one by one to draw a circle, then light travels round it. No images needed.",
+    "伸び縮みしながら回り続ける読み込みリング。ずっとループします。": "A loading ring that stretches and spins forever.",
+    "棒が下から伸び縮みし続けます。BGM や盛り上がりの表現に。ずっとループします。": "Bars rise and fall from the bottom, looping forever. Good for music or excitement.",
+    "ドットで組んだ文字が列ごとに位相をずらして上下に波打ちます。ずっとループします。": "Dot-matrix text waves up and down column by column, looping forever.",
+    "LED のドットで文字を組み、左から順に点灯します。英数字向けです。": "Builds the text from LED dots that light up left to right. Best with letters and numbers.",
+    "7セグメントの数字が 0 から目標値までカウントアップします。": "Seven-segment digits count up from 0 to your target.",
+    "7セグメントの数字が桁ごとに回転し、左から順に止まって確定します。": "Seven-segment digits spin per place and lock in from the left.",
+    "各桁がスロットのように回り、左から順に止まって数字が確定します。": "Each digit spins like a slot machine and stops from the left.",
+    "0 から目標値までヌルッと増えて、止まる瞬間に少し弾みます。": "Counts smoothly up to the target with a small bounce at the end.",
+    "少しずつ満タンまで増えて、そこからスッと戻ります。": "Fills gradually to full, then snaps back.",
+    "目盛りが左から順に点灯して満タンになり、そこから順に消えて戻ります。色は3段階に変わります。": "Ticks light up from the left until full, then go out again. The color shifts through three stages.",
+    "3回ダメージを受けて白いラグが遅れて追いつき、そのあと自然回復します。": "Takes three hits, the white trail catches up late, then it heals back.",
+    "体力が減った時だけ赤いふちが出ます。ゆっくり明滅し続けます。": "A red border appears only when health is low, pulsing slowly.",
+    "一瞬だけ全画面表示。赤いふちが残ります。": "A split-second full-screen flash that leaves a red border.",
+    "画面左上に吸い付く数値とゲージ。スコアボードと連動します。": "A number and gauge pinned to the top left, linked to a scoreboard.",
+    "画面下に黒帯とテキスト。下端に自動で吸い付きます。": "A black bar with text that sticks to the bottom of the screen.",
+    "暗幕の上に文字がふわっと出て、ゆっくり消えます。くり返しても自然につながります。": "Text drifts in over a dark backdrop and fades slowly. It loops without a visible seam.",
+    "右端からスライドインして、少し待って戻るカード。始まりと終わりが同じ位置なのでループしても自然です。": "A card slides in from the right, waits, then slides back. It starts and ends in the same place, so it loops cleanly.",
+    "回るリングと文字。1 周ぴったりで終わるので、ずっと回し続けても継ぎ目が出ません。": "A spinning ring with text. It ends on an exact turn, so it can spin forever without a seam.",
+    "3つのシーンが遅延つきで順番に流れます。": "Three scenes play in order, each with its own delay.",
+    "横回転しながら順にめくれて出ます。派手めのロゴ向け。": "Letters flip in one after another. Good for a bold logo.",
+    "画像を1枚も使わず、小さな板を並べたモデルを組み立てます。とても軽く、色や数字を変えても作り直しが一瞬です。文字は英数字向けです。": "Builds a model out of small panels without using a single image. It's very light, and changing colors or numbers rebuilds instantly. Text works best with letters and numbers.",
+    "コマ送りの画像を焼いて作ります。見た目は自由で日本語も使えますが、コマ数ぶん容量が増えます。": "Bakes the artwork into image frames. You can use any look, including Japanese text, but more frames means a bigger file.",
+    "いまの見た目のまま、コマ送りの画像にします。モデルを使わないので、どの環境でも同じように出せます。": "Turns the current look into image frames. It uses no model, so it looks the same everywhere.",
+
+    /* ---- デザインボード / design board -------------------------------------- */
+    "デザインを作る": "Create a design", "デザインを編集": "Edit the design",
+    "デザインには画像を置けます": "You can place images on the board",
+    "デザインを取り込みました。動きは「動き」タブで付けられます": "Design imported. Add motion in the Motion tab.",
+    "画像をボードに置きました": "Image placed on the board",
+    "貼り付けた画像を置きました": "Pasted image placed", "貼り付けた画像を取り込みました": "Pasted image imported",
+    "キャンバス": "Canvas", "背景を透明にする": "Transparent background", "背景を黒に": "Black background",
+    "そのほか": "Other", "ひな形": "Preset", "サンプル": "Sample", "素材ごと": "with artwork",
+    "設定のみ": "settings only", "いまの設定": "Current settings", "いまの設定を確認する": "Check the current settings",
+    "保存した設定を呼び出す": "Load saved settings", "お気に入り": "Favorites", "お気に入りの素材": "Favorite elements",
+    "お気に入りの素材…": "Favorite elements…", "お気に入りに入れる": "Add to favorites",
+    "いまのレイヤーをお気に入りに入れる": "Add the current layer to favorites",
+    "同じ設定を、いつでもここから呼び出せるようになります。": "You'll be able to load the same settings from here any time.",
+    "よく使う設定を保存しておいて、別のプロジェクトでもそのまま呼び出せます。": "Save the settings you use often and reuse them in other projects.",
+
+    /* ---- はじめての人向け / onboarding and help ------------------------------ */
+    "GeoUI Studio へようこそ": "Welcome to GeoUI Studio",
+    "Minecraft 統合版の画面に、映像や HUD を出すアドオンを作れます。まずは作り方を選んでください。": "Build add-ons that put video and HUDs on the Minecraft Bedrock screen. Start by choosing how you'd like to begin.",
+    "はじめての一歩": "First steps", "この素材について（読むだけ）": "About this element (read only)",
+    "1. 見た目をつくる": "1. Build the look", "② ゲーム内での見え方": "2. How it looks in game",
+    "③ 再生とループ": "3. Playback and looping", "① 名前をつけて書き出す": "1. Name it and export",
+    "① ゲームの中で診断する": "1. Run screen setup inside the game",
+    "② ゲームで決めた値をこのアプリにも反映する（任意）": "2. Bring the value you set in game back into this app (optional)",
+    "下のタイムラインでキー（◆）をタップすると、時間・値・動き方をここで細かく直せます。レーンの空いている所をタップすると新しいキーが入ります。": "Tap a key (◆) on the timeline below and you can fine-tune its time, value and easing here. Tapping an empty spot on a lane adds a new key.",
+    "プレビューを直接ドラッグしても動かせます。◆ を押すとその瞬間にキーが入ります。": "You can also drag straight on the preview. Pressing ◆ drops a key at that moment.",
+    "選ぶと、今の再生位置に最初のキーが入ります。": "Choosing this drops the first key at the current playhead.",
+    "押すと今の値でキーが 1 つ入ります。もう一度押すと全部消えます。": "Press once to add a key at the current value. Press again to remove them all.",
+    "同じレイヤーに登場＋退場を重ねられます。触った項目だけが上書きされます。": "You can stack an entrance and an exit on the same layer. Only the settings you touch get overwritten.",
+    "映像とぴったり合わせたいときは、書き出しタブの再生方式を「スクリプト制御」にしてください。": "To sync tightly with video, set the playback mode in the Export tab to script-driven.",
+    "この作品を動かすのに必要なコマンドをまとめました。コマンドブロックやチャットに貼って使ってください。": "Here are the commands this project needs. Paste them into a command block or the chat.",
+    "スコアボードの作り方など": "How to set up a scoreboard, and more",
+    "編集中に自動でとっておいた控えです（最大 3 つ・5 分おき）。読み込むと今の内容は置き換わります。": "Automatic backups taken while you work (up to 3, every 5 minutes). Loading one replaces what you have now.",
+    "いまの内容は消えます。必要なら先に保存してください。": "What you have now will be lost. Save it first if you need it.",
+    "このレイヤーのキーフレームをすべて消します。": "This deletes every keyframe on this layer.",
+    "素材ごと保存すると、別の端末でもそのまま続きから作れます。": "Saving with the artwork lets you pick up where you left off on another device.",
+    "素材（読み込んだ動画や画像）は含まれませんが、デザインやエフェクトは復元されます。": "Imported video and images aren't included, but your design and effects are restored.",
+    "読み込んだ動画や画像もふくめて、そのまま復元されます。": "Imported video and images are restored along with everything else.",
+    "前回の続きがあります": "You have work in progress", "前回の続きを復元しました": "Restored your work in progress",
+    "新しく始める": "Start fresh", "続きから開く": "Pick up where you left off",
+    "保存と読み込み": "Save and load", "プロジェクトを保存しました": "Project saved",
+    "プロジェクトを読み込みました": "Project loaded", "新しいプロジェクトを作りました": "Created a new project",
+    "新しいプロジェクトを作りますか": "Create a new project?", "作り直しました": "Rebuilt",
+    "GeoUI 画面設定": "GeoUI screen settings", "GeoUI 画面演出の操作": "GeoUI screen effects",
+    "GeoUI Studio で作成": "Made with GeoUI Studio",
+    "まだありません。": "Nothing here yet.", "まだ何も入っていません。": "Nothing here yet.",
+    "まだ控えがありません。しばらく編集すると自動でたまります。": "No backups yet. They pile up automatically as you work.",
+    "まだ何も入っていません。気に入った見た目ができたら入れておくと、次から一瞬で呼び出せます。": "Nothing here yet. Save a look you like and you can drop it in instantly next time.",
+    "どちらかを入れると、変化がここに出ます。": "Fill in either one and the change shows up here.",
+    "削除しますか": "Delete this?", "テクスチャを選びますか": "Choose a texture?",
+    "アニメーションを追加しますか": "Add an animation?", "全シーン": "All scenes",
+    "選択しました。手動でコピーしてください": "Selected. Please copy it manually.",
+    "コピーしました": "Copied", "貼り付けました": "Pasted", "複製しました": "Duplicated",
+    "保存しました": "Saved", "書き出しました": "Exported", "取り込みました": "Imported",
+    "レイヤーをコピーしました": "Layer copied", "モーションをコピーしました": "Motion copied",
+    "モーションを貼り付けました": "Motion pasted", "テクスチャを設定しました": "Texture set",
+    "この時点に戻しました": "Went back to this point", "ソロ表示をやめました": "Solo turned off",
+    "自動保存しました（素材ごと）": "Autosaved (with artwork)",
+    "自動保存しました（設定のみ）": "Autosaved (settings only)",
+
+    /* ---- つなぎ言葉 / glue for generated sentences --------------------------- */
+    "」を追加しました": "” added", "」を作りました": "” created", "」を読み込みました": "” loaded",
+    "」を適用しました": "” applied", "」をお気に入りに入れました": "” added to favorites",
+    "」だけを表示しています": "” is the only thing showing", "」を消します。": "” will be deleted.",
+    "枚を選択中": " layers selected", "枚を削除しました": " layers deleted",
+    "枚を複製しました": " layers duplicated", "枚をそろえました": " layers aligned",
+    "枚の名前を変えました": " layers renamed", "枚のレイヤーを消します。": " layers will be deleted.",
+    "個のキーを消しました": " keys deleted", "個のキーをコピーしました": " keys copied",
+    "個のキーを貼り付けました": " keys pasted", "個のキーに適用しました": " keys updated",
+    "個のキーを選択中": " keys selected", "コマを取り込みました": " frames imported",
+    "コマの画像素材にしました": " frames baked", "パーツ": " parts", "トラック": " tracks",
+    "件の注意があります。このままでも書き出せます。": " warnings. You can still export as is.",
+    "件、直したほうがよいところがあります。": " things are worth fixing.",
+    "にしました": " applied", "秒": "s", "枚": " layers", "コマ": " frames",
+
+    /* ---- こまかい断片 / inline fragments ------------------------------------ */
+    "のコピー": " copy", "仕組み": "How it works", "ガイド": "Guides", "記録": "Record",
+    "ふち": "Edge", "焼く": "Bake", "使う": "Use", "入れる": "Add", "はさむ": "Insert",
+    "いまの位置にはさむ": "Insert at the current position", "いま選んでいるものを入れる": "Add the current selection",
+    "エラー:": "Error:", "準備しています…": "Preparing…", "かたむき": "Tilt", "ポップ": "Pop",
+    "横 px": "Width px", "縦 px": "Height px", "(画像)": "(image)", "しゃがみ中": "Sneaking",
+    "いつでも": "Always", "この1枚だけ": "This layer only", "まとめて変える": "Change together",
+    "作り直す": "Rebuild", "この倍率にする": "Use this scale", "この値にする": "Use this value",
+    "この値を反映する": "Apply this value", "このまま書き出す": "Export as is", "名前を変える": "Rename",
+    "この色にそろえる": "Match this color", "ぜんぶ表示する": "Show all", "ぜんぶ隠す": "Hide all",
+    "ぜんぶ固定する": "Lock all", "同じシーンにまとめる": "Put them in the same scene",
+    "全部まとめて .txt で保存": "Save them all as a .txt", "3 枚以上": "3 or more",
+    "きざみを細かく（0.05%）": "Finer steps (0.05%)", "きざみを粗く（0.20%）": "Coarser steps (0.20%)",
+    "最前面へ": "Bring to front", "最背面へ": "Send to back", "ひとつ前へ": "Bring forward",
+    "ひとつ後ろへ": "Send backward", "HUD の目安": "HUD guide", "端末のふちの目安": "Device edge guide",
+    "くわしい設定を表示": "Show advanced settings", "吸着（他のレイヤーにそろえる）": "Snap (align to other layers)",
+    "画像で作る": "Build from images", "モデルで作る": "Build from a model",
+    "素材ごと保存（おすすめ）": "Save with artwork (recommended)", "設定だけ保存": "Save settings only",
+    "今のプロジェクトに足す": "Add to the current project", "置き換える": "Replace",
+    "警告バナー": "Warning banner", "1位  プレイヤーA": "1st  Player A",
+    "2位  プレイヤーB": "2nd  Player B", "3位  プレイヤーC": "3rd  Player C",
+    "文字（1文字ずつレイヤーに分けて動かす）": "Text (one layer per letter, animated separately)",
+    "英数字・記号むけ／10文字まで": "Letters, numbers and symbols, up to 10 characters",
+    "見つかりませんでした": "Nothing found", "まだ何も入っていません": "Nothing here yet",
+    "音声には動きがありません": "Audio has no motion",
+    "レイヤーを選ぶと動きを付けられます": "Select a layer to give it motion",
+    "登場・退場・ループの動きを、選ぶだけで適用できます。": "Pick an entrance, exit or loop and it's applied straight away.",
+    "左の一覧から選ぶか、画面のプレビューを直接タップすると、ここに設定が出ます。": "Pick something from the list on the left, or tap it in the preview, and its settings appear here.",
+    "移動・整列・複製・削除は選んだ全部にかかります。": "Moving, aligning, duplicating and deleting apply to everything selected.",
+    "シーンを使うと、レイヤーを": "Scenes let you ", "順番に切り替えて": "switch between layers in order",
+    "見せられます。": ".", "1つも作らなければ、すべてのレイヤーが常に表示されます。": "With no scenes at all, every layer is always visible.",
+    "いちばん早いのはテンプレートです。中身はぜんぶ後から変えられます。": "A template is the fastest start, and everything in it stays editable.",
+    "ループのつなぎ目とは": "About the loop seam",
+    "くり返し再生は、最後まで行くと一瞬で最初に戻ります。素材の周期と全体の長さが合っていないと、": "When a loop reaches the end it jumps straight back to the start. If the element's cycle doesn't match the total length, ",
+    "そこで動きが飛んで見えます。長さをそろえるだけでなめらかになります。": "the motion visibly skips there. Matching the length is usually enough to smooth it out.",
+    "プレビューの見え方は変わりません（画面に対する割合はそのままなので）。": "The preview won't look any different, because the size relative to the screen doesn't change.",
+    "正確に合わせたいときは": "To get it exactly right, use ", "画面の診断": "screen setup",
+    "を使うと、ゲームの中で実際の画面を測って合わせられます。": " to measure the real screen inside the game.",
+    "この数字を": "Making this number ", "すると、ゲーム内の表示も": " makes the in-game display ",
+    "なります。": " too.", "大きく": "bigger", "いま：画面の高さ ＝": "Now: screen height =", "単位": "units",
+    "ゲーム内で「小さすぎる／大きすぎる」ときはこれ。画面に文字を並べて実際の大きさを測り、": "Use this when things look too small or too large in game. It lays text across the screen to measure the real size, ",
+    "この端末にぴったりの設定を計算します。": "then works out the right settings for that device.",
+    "背景を透明にすると、ゲーム画面の上に重ねられます。": "Make the background transparent and it can sit on top of the game screen.",
+    "選ぶと差し替わります。文字や色はあとから変えられます。": "Choosing one swaps it in. Text and colors stay editable.",
+    "から文字や図形を置いて、指でドラッグ。四隅のつまみで大きさ、上のつまみで回転。": " to drop in text and shapes, then drag them. The corner handles resize, the top handle rotates.",
+    "できたら右上の": "When you're done, ", "で 1 枚の画像になります。": " at the top right turns it into a single image.",
+    "Canva で作って持ってくる": "Make it in Canva and bring it over",
+    "Canva は外部のサービスなので、この画面の中には埋め込めません。かわりに、": "Canva is a separate service, so it can't be embedded here. Instead, ",
+    "Canva で作った画像をそのまま受け取れます": "you can bring images made in Canva straight in",
+    "1. Canva を開く": "1. Open Canva", "下のボタンで新しいタブが開きます。": "The button below opens it in a new tab.",
+    "2. 背景を透明にして書き出す": "2. Export it with a transparent background",
+    "、「背景透過」をオンにすると重ねやすくなります。": ", and turning on transparency makes it much easier to layer.",
+    "3. ここに持ってくる": "3. Bring it here", "ダウンロードした画像を": "Take the downloaded image and ",
+    "この画面にドラッグ": "drag it onto this screen", "するか、Canva 上でコピーして": ", or copy it in Canva and ",
+    "貼り付け（Ctrl+V）": "paste it (Ctrl+V)", "するだけで取り込めます。": ". That's all it takes.",
+    "Canva を開く": "Open Canva", "まよったら Ctrl+K": "Stuck? Press Ctrl+K",
+    "やりたいことを日本語で打つだけで、そのまま実行できます。「そろえる」「書き出す」「動き」など。": "Type what you want to do and run it straight away: align, export, motion, and so on.",
+    "2. 位置を決める": "2. Place it",
+    "プレビューを直接ドラッグ。四隅で大きさ、上のつまみで回転。ほかのレイヤーの端や中心に": "Drag right on the preview. Corners resize, the top handle rotates, and it ",
+    "自動で吸い付き": "snaps automatically", "ます。": " to other layers' edges and centers.",
+    "Ctrl+クリックで複数選んで、まとめて動かす・そろえることもできます。数値は −／＋ と横スワイプ、タップでテンキーが出ます。": "Ctrl+click to select several and move or align them together. Numbers respond to −/+, sideways swipes, and a tap for the keypad.",
+    "3. 動きを付ける": "3. Add motion", "モーション": "Motion", "タブでひな形を選ぶだけ。": " tab: just pick a preset.",
+    "を入れて動かすと、その瞬間が自動でキーになります。タイムラインの◆で細かく直せます。": " and move something, and that moment becomes a key. Fine-tune it with the ◆ marks on the timeline.",
+    "4. 書き出す": "4. Export", "右上の": "The ", "で .mcaddon ができます。開くと Minecraft に取り込まれます。": " button at the top right builds an .mcaddon. Opening it installs it into Minecraft.",
+    "HUD にプレイヤーモデルの描画枠を置き、大きな板にテクスチャをコマ送りします。つまり": "It puts a player-model render frame on the HUD and flips textures across a large panel. In other words, ",
+    "動画＝全コマを並べた 1 枚の画像": "a video is one big image holding every frame",
+    "です。「モデルで作る」素材は画像を使わず、小さな板を組み合わせて動かすので極端に軽くなります。": ". Model-based elements use no images at all, just small panels, so they're extremely light.",
+    "拡大率と端寄せは": "Scale and edge alignment are ", "ゲーム内で毎フレーム計算": "recalculated every frame in game",
+    "されます。ズレたら": ". If it looks off, use ", "で合わせられます（端末ごとに保存）。": " to fix it. The result is saved per device.",
+    "軽くするコツ": "Keeping it light", "容量は": "File size comes down to ",
+    "横 × 縦 × コマ数": "width × height × frame count",
+    "でほぼ決まります。取り込み時の既定は元の 1/10、fps は 12〜15 で十分なめらかです。": ". Import defaults to 1/10 of the original, and 12–15 fps already looks smooth.",
+    "で文字や図形を並べるか、": " to arrange text and shapes, or pick from ",
+    "から選びます。Canva で作った PNG は、ドラッグか貼り付け（Ctrl+V）でそのまま使えます。": ". PNGs made in Canva work as they are: drag them in or paste with Ctrl+V.",
+    "ゲージ・カウンター・ローディングなど、動きの付いた素材をその場で作ります。": "Gauges, counters, loaders and more, built on the spot with motion already applied.",
+    "です。クリエイティブ・チート有効。": ". Creative mode and cheats are on.",
+    "ファイルを開くと Minecraft に取り込まれます": "Opening the file installs it into Minecraft",
+    "スマホ：プレビューの高さをドラッグで変える": "On phones, drag to change the preview height",
+    "反映すると、モデルの素材も同じ比率で作り直されます。": "Applying it rebuilds the model artwork at the same ratio.",
+    "用意するもの": "What you need", "JUCF-BP を開く": "Open JUCF-BP", "JUCF-RP を開く": "Open JUCF-RP",
+    "ワールドに 4 つのパック（この作品の BP・RP、JUCF の BP・RP）を入れて、": "Put all four packs in the world (this project's BP and RP, plus JUCF's BP and RP), ",
+    "チャットに次のコマンドを打つだけです。コマンドブロックは要りません。": "then type the command below in chat. No command block needed.",
+    "コマンドを打つと、画面いっぱいに横一列のボタンが並びます。": "Running the command fills the screen with a row of buttons.",
+    "いちばん右の見えるボタン": "the rightmost button you can still see",
+    "その周りだけ細かいボタンが出るので、同じように": "A finer set of buttons appears around it, so do the same again.",
+    "続けて縦方向も同じように 2 回押すと、縦横比が決まって自動で反映されます。": "Repeat twice for the vertical direction and the aspect ratio is worked out and applied automatically.",
+    "そのあと大きさの調整パネルが出ます。実際の見た目を見ながら「大きく／小さく」を押してください。": "A size panel comes next. Watch the real screen and tap bigger or smaller.",
+    "決めた値は": "The values you settle on are ", "プレイヤーごとに保存": "saved per player",
+    "され、次にワールドへ入ったときも自動で効きます。": ", and take effect automatically next time you join.",
+    "端末を変えたときや、GUI の大きさ設定を変えたときは、もう一度": "If you switch devices or change the GUI size setting, run it again",
+    "を実行してください。": ".", "を開く": "Open ", "を有効化": "Enable it",
+    "2. ワールド設定でリソースパック": "2. Enable the resource pack in the world settings",
+    "モデル(.geo.json)": "Model (.geo.json)", 
+  };
+
+  /* 日本語が入っているかの判定（英数字だけの文字列は触らない） */
+  const JP = /[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9f]/;
+
+  /* 語順が変わるもの・数字が混ざるものは、かたちで見分けて組み直す */
+  const RULES = [
+    [/^(.+?)を追加$/,        (m) => "Add " + t(m[1])],
+    [/^(.+?)を追加しますか$/, (m) => "Add " + t(m[1]) + "?"],
+    [/^(.+?)を増やす$/,      (m) => t(m[1]) + ": increase"],
+    [/^(.+?)を減らす$/,      (m) => t(m[1]) + ": decrease"],
+    [/^(.+?)を選ぶ$/,        (m) => "Choose " + t(m[1])],
+    [/^(.+?)を消します。$/,   (m) => t(m[1]) + " will be deleted."],
+    [/^「(.+?)」を出す$/,     (m) => "Show \u201C" + m[1] + "\u201D"],
+    [/^シーン\s*(\d+)$/,      (m) => "Scene " + m[1]],
+    [/^(.+?)を取り込みました$/,  (m) => "Imported " + t(m[1])],
+    [/^(.+?)を読み込みました$/,  (m) => "Loaded " + t(m[1])],
+    [/^(.+?)を作りました$/,      (m) => "Created " + t(m[1])],
+    [/^(.+?)を保存しました$/,    (m) => t(m[1]) + " saved"],
+    [/^(.+?)を削除しました$/,    (m) => t(m[1]) + " deleted"],
+    [/^レイヤー\s*(\d+)\s*枚$/, (m) => m[1] + " layers"],
+    [/^(\d+)\s*\/\s*(\d+)\s*コマ$/, (m) => m[1] + " / " + m[2] + " frames"],
+    [/^(\d+(?:\.\d+)?)\s*秒$/,      (m) => m[1] + " s"],
+    [/^(\d+)\s*枚$/,               (m) => m[1] + " layers"],
+    [/^(\d+)\s*コマ$/,             (m) => m[1] + " frames"],
+    [/^(\d+)\s*件$/,               (m) => m[1] + " items"]
+  ];
+
+  /* 先に片づける言い回し（数字が挟まるもの） */
+  const PRE = [
+    [/レイヤー\s*(\d+)\s*枚/g, "$1 layers"],
+    [/全体の長さを\s*([\d.]+)\s*秒にしました/g, "Total length set to $1 s"],
+    [/キーの時間を\s*([\d.]+)\s*倍にしました/g, "Key times scaled to $1\u00d7"],
+    [/ゲーム内の表示を\s*([\d./]+)\s*倍?に?しました/g, "In-game display scaled to $1\u00d7"],
+    [/画面の高さを\s*([\d.]+)\s*モデル単位に設定しました/g, "Screen height set to $1 model units"]
+  ];
+
+  /* 置きかえの仕上げ（数え方・かぎかっこ） */
+  const POST = [
+    [/(\d)\s*秒/g, "$1 s"], [/(\d)\s*コマ/g, "$1 frames"], [/(\d)\s*枚/g, "$1 layers"],
+    [/(\d)\s*ファイル/g, "$1 files"], [/(\d)\s*本/g, "$1"], [/(\d)\s*件/g, "$1"], [/(\d)\s*個/g, "$1"],
+    [/「/g, "\u201C"], [/」/g, "\u201D"], [/。/g, ". "], [/、/g, ", "], [/：/g, ": "], [/・/g, " \u00b7 "], [/（/g, " ("], [/）/g, ") "]
+  ];
+
+  /* 長い語から当てる。1 文字だけの語は、まぎれるので部分置換に使わない */
+  const KEYS = Object.keys(EN);
+  const SUBKEYS = KEYS.filter(k => k.length >= 2).sort((a, b) => b.length - a.length);
+
+  let lang = "ja", asked = false;
+  try {
+    const v = localStorage.getItem("geoui.lang");
+    if (v === "en" || v === "ja") { lang = v; asked = true; }
+  } catch (e) {}
+  /* 端末の言語を、最初のおすすめとして使う */
+  let suggest = "ja";
+  try { if (!/^ja/i.test(navigator.language || "")) suggest = "en"; } catch (e) {}
+  if (!asked) lang = suggest;
 
   /** 日本語の文字列を、いまの言語に直す */
   function t(text) {
-    if (lang === "ja" || !text) return text;
-    if (EN[text] !== undefined) return EN[text];
-    let out = text, hit = false;
-    for (const k of KEYS) {
+    if (lang === "ja" || text === null || text === undefined) return text;
+    const s = String(text);
+    if (EN[s] !== undefined) return EN[s];
+    const tr = s.trim();
+    if (tr !== s && EN[tr] !== undefined) return s.replace(tr, EN[tr]);
+    if (!JP.test(s)) return s;
+    for (const r of RULES) { const m = tr.match(r[0]); if (m) return r[1](m); }
+    let out = tr, hit = false;
+    for (const p of PRE) { const b = out; out = out.replace(p[0], p[1]); if (out !== b) hit = true; }
+    for (const k of SUBKEYS) {
       if (out.indexOf(k) < 0) continue;
       out = out.split(k).join(EN[k]); hit = true;
     }
-    return hit ? out : text;
+    for (const p of POST) { const b = out; out = out.replace(p[0], p[1]); if (out !== b) hit = true; }
+    if (!hit) return s;
+    out = out.replace(/\s+/g, " ").trim();
+    return tr === s ? out : s.replace(tr, out);
+  }
+
+  /* 触らない場所（入力中の文字・図の中身・コード） */
+  const SKIP = { SCRIPT: 1, STYLE: 1, CANVAS: 1, TEXTAREA: 1, CODE: 1, PRE: 1 };
+  const ATTRS = ["title", "aria-label", "placeholder", "alt", "data-tip"];
+
+  function textNode(n) {
+    const v = n.nodeValue;
+    if (!v || !JP.test(v)) return;
+    const out = t(v);
+    if (out !== v) n.nodeValue = out;
   }
 
   /** いま画面に出ている文字を、まとめて入れ替える */
   function apply(root) {
     if (lang === "ja") return;
-    const scope = root || document.body;
+    const scope = root && root.nodeType === 1 ? root : document.body;
+    if (!scope) return;
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => {
         const pn = n.parentNode;
-        if (!pn || pn.nodeName === "SCRIPT" || pn.nodeName === "STYLE") return NodeFilter.FILTER_REJECT;
-        return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        if (!pn || SKIP[pn.nodeName] || pn.closest && pn.closest("[data-noi18n]")) return NodeFilter.FILTER_REJECT;
+        return n.nodeValue && JP.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       }
     });
     const jobs = [];
     while (walker.nextNode()) jobs.push(walker.currentNode);
-    for (const n of jobs) {
-      const v = t(n.nodeValue.trim());
-      if (v !== n.nodeValue.trim()) n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), v);
-    }
-    for (const el of scope.querySelectorAll("[title],[aria-label],[placeholder]")) {
-      for (const a of ["title", "aria-label", "placeholder"]) {
+    jobs.forEach(textNode);
+    const list = scope.querySelectorAll("[title],[aria-label],[placeholder],[alt],[data-tip]");
+    for (const el of list) {
+      for (const a of ATTRS) {
         const v0 = el.getAttribute(a);
-        if (!v0) continue;
+        if (!v0 || !JP.test(v0)) continue;
         const v = t(v0);
         if (v !== v0) el.setAttribute(a, v);
       }
     }
+    /* プロジェクト名の初期値だけは英語にしておく（打ち直した名前は触らない） */
+    const pn = document.getElementById("projName");
+    if (pn && pn.value === "\u7121\u984c\u306e\u30d7\u30ed\u30b8\u30a7\u30af\u30c8") pn.value = EN["\u7121\u984c\u306e\u30d7\u30ed\u30b8\u30a7\u30af\u30c8"];
+  }
+
+  /** 画面全体（ヘッダーやタイトルもふくめて）を入れ替える */
+  function applyAll() {
+    document.documentElement.lang = lang === "en" ? "en" : "ja";
+    if (lang === "ja") return;
+    apply(document.body);
+  }
+
+  let watching = false;
+  /** 描き直しのたびに翻訳し直す（新しく作られた部分も拾う） */
+  function watch() {
+    if (watching) return;
+    watching = true;
+    const mo = new MutationObserver((recs) => {
+      if (lang === "ja") return;
+      for (const r of recs) {
+        if (r.type === "characterData") { textNode(r.target); continue; }
+        for (const n of r.addedNodes) {
+          if (n.nodeType === 1) apply(n);
+          else if (n.nodeType === 3) textNode(n);
+        }
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  function label() { return lang === "ja" ? "\u3042 JA" : "A EN"; }
+  function needsPick() { return !asked; }
+
+  /** 言語をえらぶ画面（はじめて来た人にも分かるように 2 か国語で出す） */
+  function pick(first) {
+    const cur = lang;
+    return Dialog.open({
+      title: "Language \u30fb \u8a00\u8a9e",
+      desc: "Choose the language for GeoUI Studio.\uff0f\u8868\u793a\u3059\u308b\u8a00\u8a9e\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002",
+      body: `<div class="pick" data-noi18n>
+        <button class="pickitem" data-lang="ja"><span style="font-size:22px;line-height:1">\u3042</span>
+          <span><b>\u65e5\u672c\u8a9e</b><span>\u3084\u3055\u3057\u3044\u65e5\u672c\u8a9e\u3067\u8868\u793a\u3057\u307e\u3059\u3002</span></span></button>
+        <button class="pickitem" data-lang="en"><span style="font-size:22px;line-height:1">A</span>
+          <span><b>English</b><span>Show the whole app in English.</span></span></button>
+      </div>
+      <p class="help" data-noi18n style="margin:10px 2px 0">You can change this any time from the JA / EN button in the top bar.<br>
+        \u3042\u3068\u304b\u3089\u4e0a\u306e JA / EN \u30dc\u30bf\u30f3\u3067\u5909\u3048\u3089\u308c\u307e\u3059\u3002</p>`,
+      foot: first ? null : `<button class="btn" data-close>Cancel \u30fb \u3084\u3081\u308b</button>`,
+      setup(n, close) {
+        n.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-lang]"); if (!b) return;
+          close(b.dataset.lang);
+        });
+      }
+    }).then((v) => {
+      const next = (v === "en" || v === "ja") ? v : (first ? suggest : cur);
+      asked = true;
+      try { localStorage.setItem("geoui.lang", next); } catch (e) {}
+      if (next === cur) { applyAll(); return next; }
+      lang = next;
+      if (lang === "ja") { location.reload(); return next; }  /* 英語→日本語は読み直して確実に戻す */
+      applyAll(); watch();
+      const b = document.getElementById("btnLang"); if (b) b.textContent = label();
+      return next;
+    });
   }
 
   function set(next) {
     if (next !== "ja" && next !== "en") return;
+    asked = true;
+    try { localStorage.setItem("geoui.lang", next); } catch (e) {}
     if (next === lang) return;
     lang = next;
-    try { localStorage.setItem("geoui.lang", next); } catch (e) {}
     location.reload();      /* 差し替え方式なので、確実な入れ替えのため読み直す */
   }
   const get = () => lang;
-  return { t, apply, set, get };
+  return { t, apply, applyAll, watch, set, get, pick, needsPick, label };
 })();
+
 /* 画面の描き直しのたびに翻訳し直す（新しく作られた部分も拾う） */
 function i18nWatch() {
-  if (I18N.get() === "ja") return;
-  I18N.apply(document.body);
-  const mo = new MutationObserver((recs) => {
-    for (const r of recs) for (const n of r.addedNodes) {
-      if (n.nodeType === 1) I18N.apply(n);
-      else if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) {
-        const v = I18N.t(n.nodeValue.trim());
-        if (v !== n.nodeValue.trim()) n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), v);
-      }
-    }
-  });
-  mo.observe(document.body, { childList: true, subtree: true });
+  I18N.applyAll();
+  I18N.watch();
 }
 
 /* ============================================================================
@@ -11428,6 +12132,8 @@ const App = (() => {
     if (cmdBtn) { cmdBtn.innerHTML = icon("wand"); cmdBtn.onclick = () => Palette.open(); }
     initStageGrip();
     $("#btnTheme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    const langBtn = $("#btnLang");
+    if (langBtn) { langBtn.textContent = I18N.label(); langBtn.onclick = () => I18N.pick(false); }
     $("#btnExport").onclick = () => Check.dialog();
     $("#mMenu").onclick = (e) => Menu.show(e.currentTarget, [
       ...menuItems("file").slice(0, 5), { sep: 1 }, ...menuItems("view").slice(0, 1),
@@ -11533,6 +12239,8 @@ const App = (() => {
   }
 
   function restoreOrWelcome(auto, skipWelcome) {
+    /* はじめて来た人には、まず言語を聞く */
+    if (I18N.needsPick()) { I18N.pick(true).then(() => restoreOrWelcome(auto, skipWelcome)); return; }
     if (auto && auto.data && (auto.data.layers || []).length) {
       const when = new Date(auto.at || Date.now());
       Dialog.open({
