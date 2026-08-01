@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff">
-<title>GeoUI Studio v10</title>
+<title>GeoUI Studio v10.1</title>
 <style>
 /* ============================================================================
    GeoUI Studio — Design System
@@ -1752,19 +1752,93 @@ const GGen = (() => {
   const EASE_ORDER = ["inout", "out", "in", "expo", "expoin", "backout", "back", "elastic", "bounce", "linear", "step"];
   function ease(u, kind) { return (EASE_DEFS[kind] || EASE_DEFS.linear).ml(u); }
   function easeJS(u, kind) { return (EASE_DEFS[kind] || EASE_DEFS.linear).js(u); }
+  /* ------------------------------------------------------------------
+     キーフレーム → Molang 式
+     以前は区間ごとに三項演算子を入れ子にしていたため、キーの数だけ
+     カッコが深くなり、Minecraft 側の Molang 解析が
+       「Expression could not be parsed due to stack depth overflow」
+     で落ちていた（式が読めない＝アニメーション自体が読み込まれず
+     "can't find animation geoui_transform" になる）。
+
+     いまは
+       最初の値 ＋ Σ（各区間の増分 × その区間の進み具合 0→1）
+     という足し算に直してある。進み具合は clamp で 0/1 に止まるので、
+     入れ子の三項演算子と完全に同じ値になる。さらに足し算は左右半分ずつ
+     まとめた木にしてあるので、深さはキー数の log までしか増えない。
+     ------------------------------------------------------------------ */
+  const MOLANG_MAX_SEGMENTS = 120;   /* これ以上のキーは自動で間引く */
+  const r4 = (v) => Math.round(num(v) * 10000) / 10000;
+
+  /* 直線で近似できる中間キーを落とす（step の前後は必ず残す） */
+  function thinRun(k, s, e, tol, keep) {
+    if (e - s < 2) return;
+    let idx = -1, best = tol;
+    const dt = Math.max(1e-6, k[e].t - k[s].t);
+    for (let i = s + 1; i < e; i++) {
+      const u = (k[i].t - k[s].t) / dt;
+      const d = Math.abs(k[i].v - (k[s].v + (k[e].v - k[s].v) * u));
+      if (d > best) { best = d; idx = i; }
+    }
+    if (idx < 0) return;
+    keep[idx] = true;
+    thinRun(k, s, idx, tol, keep);
+    thinRun(k, idx, e, tol, keep);
+  }
+  function thinKeys(k, maxSeg) {
+    if (k.length - 1 <= maxSeg) return k;
+    let lo = Infinity, hi = -Infinity;
+    for (const o of k) { lo = Math.min(lo, o.v); hi = Math.max(hi, o.v); }
+    const span = Math.max(1e-4, hi - lo);
+    const forced = new Array(k.length).fill(false);
+    forced[0] = forced[k.length - 1] = true;
+    for (let i = 0; i < k.length - 1; i++) if (k[i].e === "step") { forced[i] = true; forced[i + 1] = true; }
+    let out = k, tol = span * 0.003;
+    for (let n = 0; n < 24; n++) {
+      const keep = forced.slice();
+      let s = 0;
+      for (let i = 1; i < k.length; i++) if (keep[i]) { thinRun(k, s, i, tol, keep); s = i; }
+      out = k.filter((_, i) => keep[i]);
+      if (out.length - 1 <= maxSeg) break;
+      tol *= 1.7;
+    }
+    return out;
+  }
+
+  /* 0→1 にきっちり収まるように補正した緩急（expo などは端が 0/1 からわずかにズレる） */
+  function easeN(u, kind) {
+    const D = EASE_DEFS[kind] || EASE_DEFS.linear;
+    const s = D.ml(u);
+    const e0 = D.js(0), e1 = D.js(1);
+    if (!Number.isFinite(e0) || !Number.isFinite(e1)) return s;
+    const d = e1 - e0;
+    if (Math.abs(e0) < 1e-6 && Math.abs(d - 1) < 1e-6) return s;
+    if (Math.abs(d) < 1e-6) return s;
+    return `((${s}-${r4(e0)})/${r4(d)})`;
+  }
+
+  /* 足し算を左右半分ずつの木にして、カッコの深さを log に抑える */
+  function sumTree(a, s, e) {
+    if (e - s === 1) return a[s];
+    const m = (s + e) >> 1;
+    return `(${sumTree(a, s, m)}+${sumTree(a, m, e)})`;
+  }
+
   function keysExpr(keys, base, T) {
     if (!keys || keys.length === 0) return null;
-    const k = keys.slice().sort((a, b) => a.t - b.t).map(o => ({ t: num(o.t), v: num(o.v, base), e: o.e || "linear" }));
+    let k = keys.slice().sort((a, b) => a.t - b.t).map(o => ({ t: num(o.t), v: num(o.v, base), e: o.e || "linear" }));
     if (k.length === 1) return `${r3(k[0].v)}`;
-    let expr = `${r3(k[k.length - 1].v)}`;
-    for (let i = k.length - 2; i >= 0; i--) {
-      const a = k[i], b = k[i + 1];
+    k = thinKeys(k, MOLANG_MAX_SEGMENTS);
+    const terms = [];
+    for (let i = 0; i < k.length - 1; i++) {
+      const a = k[i], b = k[i + 1], d = b.v - a.v;
+      if (Math.abs(d) < 1e-4) continue;
+      if (a.e === "step") { terms.push(`(${r4(d)}*(${T}>=${r3(b.t)}))`); continue; }
       const dt = Math.max(0.0001, b.t - a.t);
       const u = `math.clamp((${T}-${r3(a.t)})/${r3(dt)},0,1)`;
-      const seg = a.e === "step" ? `${r3(a.v)}` : `(${r3(a.v)}+${r3(b.v - a.v)}*${ease(u, a.e)})`;
-      expr = `${T}<${r3(b.t)}?${seg}:(${expr})`;
+      terms.push(`(${r4(d)}*${easeN(u, a.e)})`);
     }
-    return `(${T}<${r3(k[0].t)}?${r3(k[0].v)}:(${expr}))`;
+    if (!terms.length) return `${r3(k[0].v)}`;
+    return `(${r3(k[0].v)}+${sumTree(terms, 0, terms.length)})`;
   }
 
   function planAtlas(frames, fw, fh, maxDim) {
@@ -2200,9 +2274,11 @@ const GGen = (() => {
             initialize: [
               "variable.is_holding_right = 0.0;", "variable.is_blinking = 0.0;",
               "variable.last_blink_time = 0.0;", "variable.hand_bob = 0.0;",
+              "variable.melee_spear_equipped = 0.0;",
               ...(initExtra || [])
             ],
             pre_animation: [
+              "variable.melee_spear_equipped = 0.0;",
               "variable.helmet_layer_visible = !query.has_head_gear;", "variable.leg_layer_visible = 1.0;",
               "variable.boot_layer_visible = 1.0;", "variable.chest_layer_visible = 1.0;",
               "variable.attack_body_rot_y = Math.sin(360*Math.sqrt(variable.attack_time)) * 5.0;",
